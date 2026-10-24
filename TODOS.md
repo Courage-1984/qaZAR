@@ -97,6 +97,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Multi-viewport breakpoint inversion detection (`heading-scale-inverted`) across desktop, tablet, and mobile (`jobQueue.js`).
 - [x] Unit test suite for cross-viewport scaling and style inversion in `server/test/unit.test.js`.
 
+### 16. Interactive Page Matrix Filtering & Search (Completed)
+- [x] Multi-state matrix filtering chips (`ALL`, `ERROR`, `WARN`, `CHANGED`) and live URL search input (`web/results.js`).
+- [x] Client-side row filtering with real-time match counters.
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)

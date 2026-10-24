@@ -54,9 +54,22 @@ function cellInfo(rec) {
   return { cls, label };
 }
 
+let filter = 'all';
+let query = '';
+
 function renderDetail(run) {
   const s = run.summary;
-  const rows = run.pages
+  const filtered = run.pages.filter((p) => {
+    if (query && !p.url.toLowerCase().includes(query.toLowerCase())) return false;
+    if (filter === 'all') return true;
+    const vps = Object.values(p.viewports || {});
+    if (filter === 'error') return vps.some((r) => r.violations?.some((v) => v.severity === 'error'));
+    if (filter === 'warn') return vps.some((r) => r.violations?.some((v) => v.severity === 'warn'));
+    if (filter === 'changed') return vps.some((r) => r.status === 'changed');
+    return true;
+  });
+
+  const rows = filtered
     .map(
       (p) => `<tr><td class="url"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(new URL(p.url).pathname + new URL(p.url).search)}</a>${p.roi ? `<span class="badge" style="font-size:0.7rem; margin-left:0.4rem; background:rgba(99,102,241,0.15); color:#818cf8;">${esc(p.roi.label)} · ${p.roi.score}pts</span>` : ''}</td>
       ${VPS.map((vp) => {
@@ -106,7 +119,15 @@ function renderDetail(run) {
     ` : ''}
     ${run.error ? `<p class="msg bad">${esc(run.error)}</p>` : ''}
     ${active ? '<div class="bar"><i style="width:' + (run.progress.pagesTotal ? (run.progress.pagesDone / run.progress.pagesTotal) * 100 : 5) + '%"></i></div>' : ''}
-    ${run.pages.length ? `<div class="card scroll"><table class="tbl matrix" id="matrix"><thead><tr><th>Page</th>${VPS.map((v) => `<th>${v}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
+    ${run.pages.length ? `
+      <div class="row" style="margin:1rem 0 0.5rem 0; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+        <input type="search" id="page-search" placeholder="Search pages..." value="${esc(query)}" style="padding:0.35rem 0.6rem; border-radius:6px; background:var(--card); border:1px solid var(--border); color:#fff; font-size:0.85rem; width:180px;">
+        <div style="display:flex; gap:0.3rem;">
+          ${['all', 'error', 'warn', 'changed'].map((f) => `<button class="btn sm ${filter === f ? 'primary' : ''}" data-filter="${f}">${f.toUpperCase()}</button>`).join('')}
+        </div>
+        <small class="muted" style="margin-left:auto;">Showing ${filtered.length}/${run.pages.length} pages</small>
+      </div>
+      <div class="card scroll"><table class="tbl matrix" id="matrix"><thead><tr><th>Page</th>${VPS.map((v) => `<th>${v}</th>`).join('')}</tr></thead><tbody>${rows || '<tr><td colspan="8" class="muted">No pages match filter.</td></tr>'}</tbody></table>
       <p class="muted sm">E = errors, W = warnings, dashed outline = visual change vs baseline. Click a cell for details.</p></div>` : ''}
     <div id="detail"></div>`;
   app.querySelectorAll('.cell').forEach((b) =>
@@ -115,6 +136,17 @@ function renderDetail(run) {
       renderDetail(run);
     }),
   );
+  app.querySelectorAll('[data-filter]').forEach((b) =>
+    b.addEventListener('click', () => {
+      filter = b.dataset.filter;
+      renderDetail(run);
+    }),
+  );
+  document.getElementById('page-search')?.addEventListener('input', (e) => {
+    query = e.target.value;
+    renderDetail(run);
+    document.getElementById('page-search')?.focus();
+  });
   document.getElementById('promote-all')?.addEventListener('click', async () => {
     const r = await api.promote(run.id);
     alert(`Promoted ${r.promoted} captures to baseline.`);
