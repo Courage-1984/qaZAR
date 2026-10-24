@@ -56,6 +56,7 @@ function cellInfo(rec) {
 
 let filter = 'all';
 let query = '';
+let streamState = 'idle';
 
 function renderDetail(run) {
   const s = run.summary;
@@ -82,11 +83,12 @@ function renderDetail(run) {
     .join('');
   const active = !['done', 'failed', 'cancelled'].includes(run.status);
   const statusLabel = run.crawlMessage && active ? `${run.status}: ${run.crawlMessage}` : run.status;
+  const liveBadge = active && streamState === 'sse' ? ' · 🟢 Live SSE' : active && streamState === 'poll' ? ' · 🟡 Polling' : '';
   app.innerHTML = `
     <p><a href="./results.html">← All runs</a></p>
     <h1>${esc(run.input.domain)}</h1>
     <div class="stats">
-      <div class="stat"><span class="badge ${esc(run.status)}">${esc(statusLabel)}</span><small>${esc(run.id)}</small></div>
+      <div class="stat"><span class="badge ${esc(run.status)}">${esc(statusLabel)}${liveBadge}</span><small>${esc(run.id)}</small></div>
       <div class="stat"><b>${run.progress.pagesDone}/${run.progress.pagesTotal}</b><small>pages</small></div>
       ${s ? `<div class="stat"><b>${s.violations.error}</b><small>errors</small></div><div class="stat"><b>${s.violations.warn}</b><small>warnings</small></div><div class="stat"><b>${s.changed}</b><small>visual changes</small></div><div class="stat"><b>${s.new}</b><small>new baselines</small></div>` : ''}
     </div>
@@ -184,6 +186,7 @@ async function fetchAndRender() {
     renderDetail(run);
     scrollTo(0, keepScroll);
     if (['done', 'failed', 'cancelled'].includes(run.status)) {
+      streamState = 'done';
       if (eventSource) {
         eventSource.close();
         eventSource = null;
@@ -197,6 +200,7 @@ async function fetchAndRender() {
 }
 
 function fallbackPoll() {
+  streamState = 'poll';
   if (timer) clearTimeout(timer);
   timer = setTimeout(async () => {
     const run = await fetchAndRender();
@@ -213,8 +217,10 @@ async function startWatching() {
   if (typeof EventSource !== 'undefined') {
     try {
       eventSource = new EventSource(api.eventsUrl(id));
+      streamState = 'sse';
       eventSource.onmessage = () => fetchAndRender();
       eventSource.onerror = () => {
+        streamState = 'poll';
         if (eventSource) {
           eventSource.close();
           eventSource = null;

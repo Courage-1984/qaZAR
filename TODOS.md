@@ -113,6 +113,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Pre-formatted Markdown executive summary generator for Jira/Slack sharing (`reportGenerator.js`).
 - [x] Interactive copy button with instant browser clipboard integration.
 
+### 20. Real-Time Stream State Indicator & SSE Connection Badge (Completed)
+- [x] Live SSE connection status badge (`🟢 Live SSE`, `🟡 Polling`, `✓ Complete`) in results header (`web/results.js`).
+- [x] Stream state tracking across EventSource lifecycle and automatic fallback polling.
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)
