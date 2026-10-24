@@ -168,11 +168,15 @@ test('extractCrawlSignals detects tech stack, viewport meta, and lead contacts',
   assert.ok(signals.contacts.phones.includes('+15551234567'));
   assert.ok(signals.contacts.socials.some((s) => s.includes('linkedin.com')));
 
-  const profile = aggregateSiteProfile([signals]);
+  const mockBroken = [{ url: 'https://shop.com/broken-page', status: 404 }];
+  const profile = aggregateSiteProfile([signals], mockBroken);
   assert.equal(profile.avgResponseTimeMs, 120);
   assert.equal(profile.hasMissingViewportMeta, false);
   assert.equal(profile.security.score, 100);
   assert.equal(profile.assetHygiene.uncompressedCount, 0);
+  assert.equal(profile.funnel.hasContact, true);
+  assert.equal(profile.funnel.brokenLinks.length, 1);
+  assert.equal(profile.funnel.brokenLinks[0].status, 404);
   assert.ok(profile.techStack.includes('Shopify'));
   assert.ok(profile.leadContacts.emails.includes('founder@shop.com'));
 });

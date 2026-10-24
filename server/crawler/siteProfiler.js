@@ -35,6 +35,12 @@ export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, hea
       compressed: Boolean(getH('content-encoding')),
       unlazyImages: (html.match(/<img(?![^>]*\bloading\s*=\s*["']lazy["'])[^>]*>/gi) || []).length,
     },
+    funnel: {
+      isPricing: /\b(pricing|plans|tier|billing|upgrade)\b/i.test(url),
+      isCheckout: /\b(checkout|cart|basket|order|pay)\b/i.test(url),
+      isAuth: /\b(signup|register|join|login|signin|auth)\b/i.test(url),
+      isContact: /\b(contact|support|help|sales)\b/i.test(url),
+    },
     contacts: {
       emails: [],
       phones: [],
@@ -121,7 +127,7 @@ export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, hea
  * @param {Array<object>} pageSignals
  * @returns {object}
  */
-export function aggregateSiteProfile(pageSignals = []) {
+export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
   const profile = {
     avgResponseTimeMs: 0,
     hasMissingViewportMeta: false,
@@ -130,6 +136,13 @@ export function aggregateSiteProfile(pageSignals = []) {
     seoScore: 100,
     security: { isHttps: true, hasHsts: true, hasCsp: true, score: 100, flags: [] },
     assetHygiene: { uncompressedCount: 0, unlazyImagesTotal: 0 },
+    funnel: {
+      hasPricing: false,
+      hasCheckout: false,
+      hasAuth: false,
+      hasContact: false,
+      brokenLinks: (brokenLinks || []).slice(0, 5),
+    },
   };
 
   if (!pageSignals.length) return profile;
@@ -156,6 +169,16 @@ export function aggregateSiteProfile(pageSignals = []) {
       if (!s.performance.compressed) profile.assetHygiene.uncompressedCount++;
       profile.assetHygiene.unlazyImagesTotal += s.performance.unlazyImages || 0;
     }
+    if (s.funnel) {
+      if (s.funnel.isPricing) profile.funnel.hasPricing = true;
+      if (s.funnel.isCheckout) profile.funnel.hasCheckout = true;
+      if (s.funnel.isAuth) profile.funnel.hasAuth = true;
+      if (s.funnel.isContact) profile.funnel.hasContact = true;
+    }
+  }
+
+  if (profile.leadContacts.emails.size > 0 || profile.leadContacts.phones.size > 0) {
+    profile.funnel.hasContact = true;
   }
 
   if (!profile.security.isHttps) { profile.security.score -= 40; profile.security.flags.push('Insecure HTTP'); }
@@ -182,5 +205,6 @@ export function aggregateSiteProfile(pageSignals = []) {
       flags: profile.security.flags,
     },
     assetHygiene: profile.assetHygiene,
+    funnel: profile.funnel,
   };
 }

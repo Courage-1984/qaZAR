@@ -23,6 +23,7 @@ async function bfs(start, max, { renderJs = false, onProgress } = {}) {
   const queue = [start];
   const discovered = [];
   const pageSignals = [];
+  const brokenLinks = [];
   onProgress?.('crawling:bfs', `Discovered 1 URL (${start})`);
 
   while (queue.length && discovered.length < max * 2) {
@@ -48,6 +49,8 @@ async function bfs(start, max, { renderJs = false, onProgress } = {}) {
           const jsLinks = await extractLinksHeadless(url).catch(() => []);
           links = [...new Set([...links, ...jsLinks])];
         }
+      } else if (!res.ok && res.status >= 400) {
+        brokenLinks.push({ url, status: res.status });
       }
 
       for (const l of links) {
@@ -64,7 +67,7 @@ async function bfs(start, max, { renderJs = false, onProgress } = {}) {
   onProgress?.('crawling:prioritizing', `Scoring ROI across ${discovered.length} candidates...`);
   const urls = selectTopRoiCandidates(discovered, max);
   onProgress?.('crawling:profiling', `Aggregating site tech & lead profile...`);
-  const siteProfile = aggregateSiteProfile(pageSignals);
+  const siteProfile = aggregateSiteProfile(pageSignals, brokenLinks);
   return { urls, siteProfile };
 }
 
