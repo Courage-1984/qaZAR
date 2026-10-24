@@ -131,8 +131,9 @@ test('generateExecutiveReport produces standalone HTML with lead generation CTA'
     pages: [],
     siteProfile: { leadContacts: { emails: ['ceo@client.com'], phones: ['+1234567890'], socials: [] } },
   };
-  const html = generateExecutiveReport(mockRun, 'leads@agency.com');
+  const html = generateExecutiveReport(mockRun, 'leads@agency.com', { agency: 'Apex Advisory' });
   assert.ok(html.includes('<!doctype html>'));
+  assert.ok(html.includes('Apex Advisory'));
   assert.ok(html.includes('client-site.com'));
   assert.ok(html.includes('Engineering Remediation vs. Rebuild Assessment'));
   assert.ok(html.includes('Verified Domain Ownership &amp; Key Contacts'));

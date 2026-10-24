@@ -69,6 +69,7 @@ Generates a client-ready quality assessment report or JSON health summary.
 - **Query Parameters**:
   - `format=json`: Returns machine-readable JSON containing score, grade, clusters, dev effort estimation (`roiAssessment`), 3-tier roadmap, and tech stack profile.
   - `email=agency@dev.com`: Customizes the recipient email in the lead generation CTA.
+  - `agency=Apex+Advisory`: Customizes the agency / consultant brand in header, footer, and lead CTA.
   - `download=1`: Sets `Content-Disposition: attachment` to trigger automatic browser file download.
 - **HTML Report Features**:
   - Executive health score (0–100), letter grade (A–F), and status assessment.

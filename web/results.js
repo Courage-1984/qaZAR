@@ -97,7 +97,7 @@ function renderDetail(run) {
         <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.25rem;">Crawl &amp; Lead Intelligence</div>
         <div class="row" style="gap: 1.5rem; flex-wrap: wrap; font-size: 0.85rem;">
           <div>⏱️ <b>${run.siteProfile.avgResponseTimeMs}ms</b> latency</div>
-          <div>🛠️ <b>${esc(run.siteProfile.techStack.join(', ') || 'Custom')}</b></div>
+          <div>🛠️ <b>${esc((run.siteProfile.techStack || []).join(', ') || 'Custom')}</b></div>
           <div>📱 <b>${run.siteProfile.hasMissingViewportMeta ? '⚠️ Missing Viewport' : '✓ Viewport Meta'}</b></div>
           <div>🎯 <b>${[run.siteProfile.funnel?.hasPricing ? 'Pricing' : null, run.siteProfile.funnel?.hasCheckout ? 'Checkout' : null, run.siteProfile.funnel?.hasContact ? 'Contact' : null].filter(Boolean).join(' · ') || 'Brochureware'}</b></div>
           ${run.siteProfile.assetHygiene?.blockingScriptsTotal ? `<div style="color:#f59e0b;">⚠️ <b>${run.siteProfile.assetHygiene.blockingScriptsTotal} Blocking Script(s)</b></div>` : ''}

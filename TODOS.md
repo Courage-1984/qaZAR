@@ -129,6 +129,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Detected deprecated HTML legacy tags (`<center>`, `<font>`, `<marquee>`) and missing image `alt` descriptions during crawl (`siteProfiler.js`).
 - [x] Incorporated code hygiene indicators and favicon checks into remediation roadmap and rebuild ROI scoring (`scoreCalculator.js`, `reportGenerator.js`).
 
+### 24. Agency Whitelabeling & Custom Advisory Branding (Completed)
+- [x] Configurable agency brand name and advisory styling (`?agency=`) across executive audit header, footer, and lead CTA (`reportGenerator.js`, `routes/runs.js`).
+- [x] Updated client web API helper to support structured report query parameters (`web/api.js`).
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)
