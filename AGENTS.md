@@ -35,13 +35,14 @@ Viewport UI/UX QA + visual regression suite. Node/Express API + Playwright worke
 
 ## Roadmap (update when state changes)
 - Done: Phase 1 pipeline, heuristics (overflow, touch, typography, contrast, media bleed, collisions, nav collapse), diff UI.
-- MVP Phase:
-  - Local HTML fixtures with known violations + Playwright heuristic test suite (replaces string checks).
+- MVP Phase (Completed):
+  - Local HTML fixtures with known violations + Playwright heuristic test suite.
   - Real-time progress in UI via SSE (`GET /api/runs/:id/events`).
-  - False-positive tuning: indeterminate contrast for background images/gradients, collision sample expansion, nav-collapse refinement, cross-viewport comparison expansion.
+  - False-positive tuning: indeterminate contrast, collision expansion, nav-collapse refinement, cross-viewport breakpoint inversion.
   - Docker containerization: production `Dockerfile` with Node 20 + headless Chromium + `docker-compose.yml`.
-  - VPS & live deployment (beyond GH Pages): reverse proxy (Caddy/Nginx), SSL, healthcheck (`GET /healthz`), and systemd/compose deployment guide.
-  - Robots.txt parser to respect targets before public launch.
+  - VPS & live deployment (beyond GH Pages): reverse proxy (Caddy/Nginx), SSL, healthcheck (`GET /healthz`), and deployment guide.
+  - Robots.txt parser and strict compliance across BFS and sitemaps.
+  - High-ROI site profiling, lead intelligence extraction, and executive audit reports with print/PDF engine.
 - Tail End (Post-MVP):
   - Auth, API keys, usage limits/quotas, tenant isolation (`ownerId`).
   - DB/S3 storage migration (SQLite/PostgreSQL + Cloudflare R2 / AWS S3).

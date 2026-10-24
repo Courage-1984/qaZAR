@@ -3,6 +3,7 @@ import { collectSitemapUrls, discoverSitemaps } from './sitemap.js';
 import { extractLinksHeadless } from './headlessCrawl.js';
 import { selectTopRoiCandidates } from './roiScorer.js';
 import { extractCrawlSignals, aggregateSiteProfile } from './siteProfiler.js';
+import { parseRobotsTxt, isUrlAllowed } from './robots.js';
 
 /** Extract same-origin hrefs from HTML (regex; fast for static discovery). */
 export function extractLinks(html, baseUrl) {
@@ -18,7 +19,7 @@ export function extractLinks(html, baseUrl) {
  * Breadth-first crawl from a starting URL.
  * Extracts lightweight performance, tech stack, and lead signals on the fly.
  */
-async function bfs(start, max, { renderJs = false, onProgress } = {}) {
+async function bfs(start, max, { renderJs = false, onProgress, disallows = [] } = {}) {
   const seen = new Set([start]);
   const queue = [start];
   const discovered = [];
@@ -54,7 +55,7 @@ async function bfs(start, max, { renderJs = false, onProgress } = {}) {
       }
 
       for (const l of links) {
-        if (!seen.has(l)) {
+        if (!seen.has(l) && isUrlAllowed(l, disallows)) {
           seen.add(l);
           queue.push(l);
         }
@@ -78,6 +79,22 @@ async function bfs(start, max, { renderJs = false, onProgress } = {}) {
  */
 export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs = false, onProgress }) {
   const start = normalizeUrl(domain);
+  const origin = new URL(start).origin;
+
+  let disallows = [];
+  try {
+    const robotsRes = await fetch(`${origin}/robots.txt`, {
+      headers: { 'user-agent': 'qaZAR/0.1' },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (robotsRes.ok) {
+      const robotsTxt = await robotsRes.text();
+      disallows = parseRobotsTxt(robotsTxt).disallows || [];
+    }
+  } catch {
+    /* no robots.txt */
+  }
+
   onProgress?.('crawling:sitemap', `Discovering sitemaps for ${domain}...`);
   const candidates = sitemap_url ? [sitemap_url] : await discoverSitemaps(domain);
   const sitemapUrls = [];
@@ -91,7 +108,7 @@ export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs
     if (sitemapUrls.length >= max_pages * 2) break;
   }
 
-  const uniq = [...new Set(sitemapUrls)];
+  const uniq = [...new Set(sitemapUrls)].filter((u) => isUrlAllowed(u, disallows));
   if (uniq.length) {
     onProgress?.('crawling:prioritizing', `Prioritizing top ${max_pages} ROI URLs from sitemap...`);
     const prioritized = selectTopRoiCandidates(uniq, max_pages);
@@ -114,6 +131,6 @@ export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs
   }
 
   onProgress?.('crawling:bfs', `Starting BFS discovery crawl on ${start}...`);
-  const { urls, siteProfile } = await bfs(start, max_pages, { renderJs, onProgress });
+  const { urls, siteProfile } = await bfs(start, max_pages, { renderJs, onProgress, disallows });
   return { urls: urls.length ? urls : [start], source: 'crawl', siteProfile };
 }

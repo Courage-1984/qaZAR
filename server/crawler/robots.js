@@ -5,6 +5,7 @@
 export function parseRobotsTxt(content = '') {
   const disallows = [];
   const sitemaps = [];
+  let crawlDelay = 0;
   let isTargetAgent = false;
 
   for (const rawLine of content.split('\n')) {
@@ -20,12 +21,15 @@ export function parseRobotsTxt(content = '') {
       isTargetAgent = ua === '*' || ua.includes('qazar');
     } else if (field === 'disallow' && isTargetAgent) {
       if (val) disallows.push(val);
+    } else if (field === 'crawl-delay' && isTargetAgent) {
+      const d = parseFloat(val);
+      if (!isNaN(d)) crawlDelay = d;
     } else if (field === 'sitemap') {
       sitemaps.push(val);
     }
   }
 
-  return { disallows, sitemaps };
+  return { disallows, sitemaps, crawlDelay };
 }
 
 export function isUrlAllowed(urlStr, disallows = []) {

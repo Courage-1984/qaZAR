@@ -105,6 +105,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Verified OpenGraph image/title and canonical URL presence (`siteProfiler.js`).
 - [x] Social preview readiness card in executive report and actionable roadmap quick-win triggers.
 
+### 18. Polite Robots.txt Enforcement & Crawl-Delay (Completed)
+- [x] Polite crawler compliance: respects robots.txt `Disallow` rules across BFS and sitemaps (`crawl.js`).
+- [x] Parsed `Crawl-delay` and sitemap declarations (`robots.js`).
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)

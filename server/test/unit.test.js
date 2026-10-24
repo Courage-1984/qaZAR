@@ -72,11 +72,13 @@ test('robots.txt parser extracts disallows and sitemaps correctly', async () => 
 User-agent: *
 Disallow: /admin/
 Disallow: /private/
+Crawl-delay: 2
 Sitemap: https://example.com/sitemap.xml
 `;
   const parsed = parseRobotsTxt(sample);
   assert.deepEqual(parsed.disallows, ['/admin/', '/private/']);
   assert.deepEqual(parsed.sitemaps, ['https://example.com/sitemap.xml']);
+  assert.equal(parsed.crawlDelay, 2);
   assert.equal(isUrlAllowed('https://example.com/pricing', parsed.disallows), true);
   assert.equal(isUrlAllowed('https://example.com/admin/settings', parsed.disallows), false);
 });
