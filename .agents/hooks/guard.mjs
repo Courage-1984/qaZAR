@@ -16,6 +16,10 @@ const RULES = [
   [/(^|[\s;&|])rm\s+-[a-z]*r[a-z]*\s+(\/|~|\*|\.git\b|\.\s*$)/i, 'Recursive rm on root/home/.git/cwd is blocked.'],
   [/Remove-Item\b[^\n]*-Recurse[^\n]*(\.git\b|[A-Za-z]:\\?\s*$|\\\*|\s\.\s*$)/i, 'Recursive Remove-Item on .git/drive/cwd is blocked.'],
   [/(curl|wget|iwr|Invoke-WebRequest)\b[^\n]*\|\s*(sh|bash|iex|Invoke-Expression)/i, 'Piping downloads into a shell is blocked.'],
+  [/npm\s+publish/i, 'qaZAR is a private project; npm publish is blocked.'],
+  [/git\s+branch\s+-[dD]\s+(main|master)\b/i, 'Deleting main/master branch is blocked.'],
+  [/git\s+checkout\s+-[fF]\b/i, 'Forced checkout (-f) can discard uncommitted work.'],
+  [/git\s+add\b[^\n]*\.(png|jpg|jpeg|webp|mp4|mov|zip|tar|gz)\b/i, 'Do not stage media/screenshot binaries directly into git.'],
 ];
 
 let payload = {};
@@ -37,5 +41,5 @@ if (hit) {
   }
   console.log(JSON.stringify({ decision: 'deny', reason }));
 } else {
-  console.log(claude ? '' : '{}');
+  console.log(claude ? '' : JSON.stringify({ decision: 'allow' }));
 }

@@ -6,7 +6,7 @@ import { slugFor } from '../crawler/normalize.js';
 import { capturePage, VIEWPORTS } from '../engine/capturePage.js';
 import { baselinePath, hasBaseline, promote } from '../visual/baseline.js';
 import { diffImages } from '../visual/diff.js';
-import { getRun, runPath, save } from '../store/runStore.js';
+import { getRun, runPath, save } from '../storage/runStore.js';
 
 const cancelled = new Set();
 export const cancelRun = (id) => cancelled.add(id);
@@ -137,6 +137,7 @@ export async function processRun(runId) {
       for (const vp of VIEWPORTS) {
         if (cancelled.has(runId)) return;
         await processViewport(run, page, vp);
+        save(run);
       }
       evaluateCrossViewport(page);
       run.progress.pagesDone++;

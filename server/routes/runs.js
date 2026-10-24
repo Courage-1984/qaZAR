@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createRun, getRun, listRuns, removeRun, runPath, save, subscribe } from '../store/runStore.js';
+import { createRun, getRun, listRuns, removeRun, runPath, save, subscribe } from '../storage/runStore.js';
 import { cancelRun, enqueue } from '../queue/jobQueue.js';
 import { promoteRun } from '../visual/baseline.js';
 import { validateRunInput } from './validate.js';
@@ -27,9 +27,29 @@ runsRouter.get('/:id', (req, res) => {
 runsRouter.get('/:id/events', (req, res) => {
   const run = getRun(req.params.id);
   if (!run) return res.status(404).end();
-  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
-  res.write(`data: ${JSON.stringify({ status: run.status, progress: run.progress })}\n\n`);
+
+  res.set({
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no', // Disable buffering on Nginx reverse proxy
+  });
+  res.flushHeaders?.();
+
+  // Initial event
+  res.write(`data: ${JSON.stringify({ status: run.status, progress: run.progress, summary: run.summary })}\n\n`);
   subscribe(run.id, res);
+
+  // Keep-alive heartbeat every 15s for reverse proxies
+  const keepAlive = setInterval(() => {
+    try {
+      res.write(': keep-alive\n\n');
+    } catch {
+      clearInterval(keepAlive);
+    }
+  }, 15000);
+
+  res.on('close', () => clearInterval(keepAlive));
 });
 
 runsRouter.post('/:id/baseline', (req, res) => {

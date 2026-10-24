@@ -43,3 +43,26 @@ test('evaluate is a function suitable for page.evaluate', async () => {
   assert.ok(evaluate.toString().includes('element-collision'));
   assert.ok(evaluate.toString().includes('nav-not-collapsed'));
 });
+
+test('roiScorer prioritizes high-impact pages over paginated links', async () => {
+  const { scoreUrl, selectTopRoiCandidates } = await import('../crawler/roiScorer.js');
+  const home = scoreUrl('https://example.com/');
+  const pricing = scoreUrl('https://example.com/pricing');
+  const pagination = scoreUrl('https://example.com/blog/page/3');
+
+  assert.ok(home.score > pagination.score);
+  assert.ok(pricing.score > pagination.score);
+
+  const pool = [
+    'https://example.com/blog/post-1',
+    'https://example.com/blog/post-2',
+    'https://example.com/pricing',
+    'https://example.com/login',
+    'https://example.com/checkout',
+  ];
+  const top = selectTopRoiCandidates(pool, 3);
+  assert.ok(top.includes('https://example.com/pricing'));
+  assert.ok(top.includes('https://example.com/checkout'));
+  assert.ok(top.includes('https://example.com/login'));
+});
+

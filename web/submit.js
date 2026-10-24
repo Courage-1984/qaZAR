@@ -39,6 +39,7 @@ $('run-form').addEventListener('submit', async (e) => {
       domain,
       sitemap_url: $('sitemap_url').value.trim(),
       max_pages: Number($('max_pages').value) || 10,
+      renderJs: Boolean($('render_js')?.checked),
     });
     location.href = `./results.html?id=${encodeURIComponent(runId)}`;
   } catch (err) {

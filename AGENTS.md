@@ -30,12 +30,23 @@ Viewport UI/UX QA + visual regression suite. Node/Express API + Playwright worke
 - UI: accessible (labels, unique ids, >=48px targets), dark premium look, no inline secrets, escape all API strings (`esc()` in `web/api.js`).
 - Tests: pure logic gets a unit test; heuristics changes need a fixture or e2e evidence in the summary.
 - Commits: imperative, scoped (`heuristics: …`, `ui: …`). Push to `main` is allowed; **never force-push**.
+- File caps: code <= 250 lines (evaluate.js <= 400), agentic context <= 150 lines, docs <= 200 lines (`.agents/rules/context-caps.md`).
 - Keep this file < 150 lines. Put detail in `.agents/rules/` or skills, not here.
 
 ## Roadmap (update when state changes)
 - Done: Phase 1 pipeline, heuristics (overflow, touch, typography, contrast, media bleed, collisions, nav collapse), diff UI.
-- Next: local HTML fixtures with known violations + heuristic tests · false-positive tuning on real sites · SSE progress in UI · Docker image.
-- Later: free VPS/Cloudflare/Oracle hosting · auth + API keys + usage limits · DB/S3 storage · shareable public report pages · payments.
+- MVP Phase:
+  - Local HTML fixtures with known violations + Playwright heuristic test suite (replaces string checks).
+  - Real-time progress in UI via SSE (`GET /api/runs/:id/events`).
+  - False-positive tuning: indeterminate contrast for background images/gradients, collision sample expansion, nav-collapse refinement, cross-viewport comparison expansion.
+  - Docker containerization: production `Dockerfile` with Node 20 + headless Chromium + `docker-compose.yml`.
+  - VPS & live deployment (beyond GH Pages): reverse proxy (Caddy/Nginx), SSL, healthcheck (`GET /healthz`), and systemd/compose deployment guide.
+  - Robots.txt parser to respect targets before public launch.
+- Tail End (Post-MVP):
+  - Auth, API keys, usage limits/quotas, tenant isolation (`ownerId`).
+  - DB/S3 storage migration (SQLite/PostgreSQL + Cloudflare R2 / AWS S3).
+  - Shareable unguessable public report permalinks.
+  - Paywall & payment processing.
 
 ## Known weak spots
 - Contrast skips elements over background images/gradients (approximation, not flagged as indeterminate yet).
@@ -44,4 +55,5 @@ Viewport UI/UX QA + visual regression suite. Node/Express API + Playwright worke
 - `evaluateCrossViewport` compares `desktop` vs `mobile` H1 only.
 
 ## Agent tooling map
-Rules: `.agents/rules/` · Skills: `.agents/skills/` (mirrored as pointers in `.claude/skills/`) · Workflows: `.agents/workflows/` (`/verify`, `/ship`) · Hooks: `.agents/hooks.json` → `.agents/hooks/guard.mjs` (shared with Claude Code) · Subagents: `.claude/agents/`.
+Rules: `.agents/rules/` · Skills: `.agents/skills/` (mirrored in `.claude/skills/`) · Workflows: `.agents/workflows/` (`/verify`, `/ship`, `/test-heuristics`, `/audit-security`, `/docker-test`) · Hooks: `hooks.json` → `guard.mjs` (PreToolUse) + `post-tool.mjs` (PostToolUse) · MCP: `mcp_config.json` / `.mcp.json` · Subagents: `.claude/agents/`.
+

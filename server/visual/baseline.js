@@ -1,17 +1,15 @@
-import fs from 'node:fs';
 import path from 'node:path';
-import { baselinesDir } from '../config.js';
+import { storage } from '../storage/storageAdapter.js';
 import { siteHash, slugFor } from '../crawler/normalize.js';
 
 export const baselinePath = (domain, slug, vpName) =>
-  path.join(baselinesDir(), siteHash(domain), slug, `${vpName}.png`);
+  storage.getBaselinePath(domain, slug, vpName);
 
-export const hasBaseline = (domain, slug, vpName) => fs.existsSync(baselinePath(domain, slug, vpName));
+export const hasBaseline = (domain, slug, vpName) =>
+  storage.hasBaseline(domain, slug, vpName);
 
 export function promote(domain, slug, vpName, srcPng) {
-  const dest = baselinePath(domain, slug, vpName);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.copyFileSync(srcPng, dest);
+  return storage.saveBaseline(domain, slug, vpName, srcPng);
 }
 
 /** Promote screenshots of a run (optionally one page/viewport) to baselines. */
@@ -30,4 +28,4 @@ export function promoteRun(run, runDir, { slug, viewport } = {}) {
   return n;
 }
 
-export { slugFor };
+export { slugFor, siteHash };

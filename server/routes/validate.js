@@ -34,5 +34,6 @@ export async function validateRunInput(body = {}) {
   if (sitemap_url) sitemap_url = await assertPublicUrl(sitemap_url, 'sitemap_url');
   const n = Number.parseInt(body.max_pages ?? 10, 10);
   if (!Number.isFinite(n) || n < 1) throw new Error('max_pages must be a positive integer');
-  return { domain, sitemap_url: sitemap_url || null, max_pages: Math.min(n, config.maxPagesCap) };
+  const renderJs = Boolean(body.renderJs);
+  return { domain, sitemap_url: sitemap_url || null, max_pages: Math.min(n, config.maxPagesCap), renderJs };
 }

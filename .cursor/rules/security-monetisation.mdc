@@ -1,0 +1,12 @@
+---
+description: Security and multi-tenant monetisation invariants for qaZAR
+globs: server/routes/**,server/crawler/**,server/store/**
+alwaysApply: false
+---
+
+# Security & Monetisation Rules
+
+1. SSRF Protection: All target URLs must pass `validateRunInput` / `isPrivateIp` checks. Reject loopback, link-local, and RFC1918 private IPs unless `ALLOW_PRIVATE=1`.
+2. Target Protection: Cap crawl concurrency and set timeouts.
+3. Zero Secrets: Never commit `.env`, credentials, or `settings.local.json`.
+4. Multi-Tenant Readiness: Store run metadata and baselines with an `ownerId` parameter in mind to support future accounts and paywalled access.

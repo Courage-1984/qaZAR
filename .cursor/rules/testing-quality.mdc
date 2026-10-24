@@ -1,0 +1,13 @@
+---
+description: Testing and build verification standards before committing
+alwaysApply: true
+---
+
+# Testing & Quality Guardrails
+
+1. Run `npm test` before committing any change under `server/`.
+2. Run `npm run build:web` before committing any change under `web/`.
+3. For changes to `server/heuristics/evaluate.js`:
+   - Verify JS syntax: `node --check server/heuristics/evaluate.js`.
+   - Ensure the closure is 100% self-contained (no imports or outer scope dependencies).
+4. Run e2e smoke verification whenever engine, crawler, or diff code is modified.

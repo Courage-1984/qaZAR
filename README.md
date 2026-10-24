@@ -67,3 +67,20 @@ Environment variables:
 - `DATA_DIR`: Directory for runs & baselines (default: `server/../data`)
 - `PAGE_CONCURRENCY`: Parallel page processing (default: 2)
 - `ALLOW_PRIVATE=1`: Allow localhost or private IP targets (disabled by default to prevent SSRF)
+
+## Documentation
+
+Detailed documentation is modularized under `docs/`:
+- [Architecture & System Design](docs/architecture.md): Subsystems, 7-viewport isolation, storage adapter, and heuristics.
+- [Crawler & Top ROI Scoring](docs/crawler-roi.md): Sitemap BFS, headless JS rendering, and high-impact page prioritization.
+- [API Reference](docs/api.md): Endpoints, SSE streaming format, health checks, and error schemas.
+- [Deployment Guide](docs/deployment.md): Docker Compose, VPS hosting, shared memory requirements, and Caddy/Nginx reverse proxy setups.
+
+## Roadmap & Status
+
+See [TODOS.md](TODOS.md) for detailed task tracking.
+- **Phase 1 (Done)**: Core 7-viewport capture engine, heuristics v1, visual diffing, static Vite UI on GitHub Pages.
+- **Phase 2 (MVP / Current)**: Local HTML fixtures & Playwright heuristic test suite, SSE progress streaming, false-positive tuning, Docker image, and live VPS deployment (Caddy/Nginx, SSL, health checks).
+- **Phase 3 (Tail End)**: Authentication, multi-tenant isolation, database/S3 migration, public shareable reports, and monetisation/paywall.
+
+

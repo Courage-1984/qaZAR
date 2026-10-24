@@ -1,0 +1,13 @@
+node_modules
+data
+web/dist
+.git
+.github
+.agents
+.claude
+.cursor
+*.log
+.env
+settings.local.json
+Agentic Governance Refactoring Protocol*.md
+Claude Code - agentic configuration files.md

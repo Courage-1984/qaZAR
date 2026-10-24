@@ -1,0 +1,10 @@
+---
+description: File length and context budget caps across code, agentic files, and documentation
+alwaysApply: true
+---
+
+# Context & File Length Caps
+
+1. Code files: capped at 250 lines (evaluate.js capped at 400).
+2. Agent files: AGENTS.md capped at 150 lines; rules and subagents capped at 80 lines; workflows capped at 50 lines.
+3. Documentation: capped at 200 lines per file (modular docs under `docs/`).

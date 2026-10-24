@@ -113,17 +113,60 @@ function renderCell(run) {
   });
 }
 
-async function poll() {
+let eventSource = null;
+
+async function fetchAndRender() {
   try {
     const run = await api.getRun(id);
     const keepScroll = scrollY;
     renderDetail(run);
     scrollTo(0, keepScroll);
-    if (!['done', 'failed', 'cancelled'].includes(run.status)) timer = setTimeout(poll, 2000);
+    if (['done', 'failed', 'cancelled'].includes(run.status)) {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      if (timer) clearTimeout(timer);
+    }
+    return run;
   } catch (e) {
     fail(e);
   }
 }
 
-if (id) poll();
+function fallbackPoll() {
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(async () => {
+    const run = await fetchAndRender();
+    if (run && !['done', 'failed', 'cancelled'].includes(run.status)) {
+      fallbackPoll();
+    }
+  }, 2000);
+}
+
+async function startWatching() {
+  const initial = await fetchAndRender();
+  if (!initial || ['done', 'failed', 'cancelled'].includes(initial.status)) return;
+
+  if (typeof EventSource !== 'undefined') {
+    try {
+      eventSource = new EventSource(api.eventsUrl(id));
+      eventSource.onmessage = () => fetchAndRender();
+      eventSource.onerror = () => {
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+        fallbackPoll();
+      };
+      return;
+    } catch {
+      /* fallback */
+    }
+  }
+  fallbackPoll();
+}
+
+if (id) startWatching();
 else renderList();
+
