@@ -16,7 +16,7 @@ function esc(s) {
  * designed to capture qualified inbound leads for site redesigns/rebuilds.
  */
 export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev') {
-  const { score, grade, status, recommendation, metrics, clusters } = calculateHealthScore(run);
+  const { score, grade, status, recommendation, metrics, clusters, roiAssessment } = calculateHealthScore(run);
   const domain = run.input?.domain || 'Unknown Domain';
   const dateStr = new Date(run.createdAt || Date.now()).toLocaleDateString('en-US', {
     month: 'short',
@@ -170,10 +170,28 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
       `).join('')}
     </section>` : ''}
 
+    ${roiAssessment ? `
+    <section class="impact-section">
+      <h2>Engineering Remediation vs. Rebuild Assessment</h2>
+      <div class="card" style="border-left: 4px solid ${roiAssessment.recommendationType === 'rebuild' ? '#a855f7' : '#10b981'};">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+          <div>
+            <div style="font-size:0.75rem; text-transform:uppercase; color:var(--muted); letter-spacing:0.05em;">Strategic Recommendation</div>
+            <div style="font-size:1.2rem; font-weight:700; color:#fff;">${esc(roiAssessment.recommendationTitle)}</div>
+          </div>
+          <div>
+            <div style="font-size:0.75rem; text-transform:uppercase; color:var(--muted); letter-spacing:0.05em;">Estimated Dev Effort</div>
+            <div style="font-size:1.2rem; font-weight:700; color:var(--accent);">~${roiAssessment.estimatedHours} Engineering Hours</div>
+          </div>
+        </div>
+        <p style="margin-top:0.75rem; font-size:0.9rem; color:var(--muted);">${esc(roiAssessment.recommendationReason)}</p>
+      </div>
+    </section>` : ''}
+
     <section class="cta-card">
       <h2>Turn Audit Findings Into High-Converting UX</h2>
       <p>Remediate responsive breakage, eliminate accessibility compliance liabilities, or discuss a modern, high-performance website rebuild engineered to pass 100% of multi-viewport tests.</p>
-      <a class="btn-cta" href="mailto:${esc(leadEmail)}?subject=${encodeURIComponent(`UX Remediation Quote – ${domain}`)}&body=${encodeURIComponent(`Hi,\n\nI reviewed our qaZAR Quality Audit (Score: ${score}/100, Grade ${grade}) for ${domain}.\n\nWe would like to request an engineering remediation plan and redesign/rebuild quote.\n\nRun ID: ${run.id}`)}">Request Full Remediation Plan &amp; Rebuild Quote →</a>
+      <a class="btn-cta" href="mailto:${esc(leadEmail)}?subject=${encodeURIComponent(`Remediation Plan & Quote – ${domain}`)}&body=${encodeURIComponent(`Hi,\n\nI reviewed our qaZAR Quality Audit (Score: ${score}/100, Grade ${grade}) for ${domain}.\n\nStrategic Recommendation: ${roiAssessment?.recommendationTitle || ''} (Est. ${roiAssessment?.estimatedHours || 0} dev hours).\n\nWe would like to request an engineering remediation plan and redesign/rebuild quote.\n\nRun ID: ${run.id}`)}">Request Full Remediation Plan &amp; Rebuild Quote →</a>
     </section>
 
     <div class="footer">

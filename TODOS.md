@@ -69,6 +69,11 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Exportable JSON summary (`?format=json`) and customizable lead capture agency email (`?email=`) in report generator.
 - [x] Automatic stale process detection and auto-termination on port 8787 upon server start (`server/freePort.js`).
 
+### 10. High-ROI Report Intelligence & Noise Elimination (Completed)
+- [x] Cross-viewport defect clustering (`server/report/scoreCalculator.js`) to eliminate repetition, duplicate noise, and report inflation.
+- [x] Zero-overhead transport security (HTTPS, HSTS, CSP) and asset compression (Gzip/Brotli) profiling (`server/crawler/siteProfiler.js`).
+- [x] Engineering Remediation vs. Rebuild ROI Calculator (`estimateRemediationRoi`) in executive reports and lead capture emails.
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)

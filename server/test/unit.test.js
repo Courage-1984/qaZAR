@@ -112,6 +112,8 @@ test('calculateHealthScore and clusterDefects eliminate noise and group patterns
   assert.equal(result.metrics.distinctErrors, 1);
   assert.equal(result.metrics.globalDefects, 1);
   assert.equal(result.metrics.rawErrors, 3);
+  assert.ok(result.roiAssessment.estimatedHours > 0);
+  assert.ok(result.roiAssessment.recommendationTitle);
 });
 
 test('generateExecutiveReport produces standalone HTML with lead generation CTA', async () => {
@@ -126,6 +128,7 @@ test('generateExecutiveReport produces standalone HTML with lead generation CTA'
   const html = generateExecutiveReport(mockRun, 'leads@agency.com');
   assert.ok(html.includes('<!doctype html>'));
   assert.ok(html.includes('client-site.com'));
+  assert.ok(html.includes('Engineering Remediation vs. Rebuild Assessment'));
   assert.ok(html.includes('Request Full Remediation Plan'));
   assert.ok(html.includes('mailto:leads@agency.com'));
 });

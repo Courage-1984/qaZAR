@@ -127,5 +127,35 @@ export function calculateHealthScore(run) {
       categories,
     },
     clusters,
+    roiAssessment: estimateRemediationRoi(run, finalScore, errorClusters.length, warnClusters.length, clusters.filter((c) => c.isGlobal).length),
+  };
+}
+
+export function estimateRemediationRoi(run, score, distinctErrors, distinctWarnings, globalDefects) {
+  const techStack = run.siteProfile?.techStack || [];
+  const hasLegacyDebt = techStack.some((t) => t.includes('Legacy') || t.includes('WordPress'));
+  const multiplier = hasLegacyDebt ? 1.3 : 1.0;
+
+  const baseHours = 4;
+  const errorHours = distinctErrors * 2.5;
+  const warnHours = distinctWarnings * 1.0;
+  const estimatedHours = Math.round((baseHours + errorHours + warnHours) * multiplier);
+
+  let recommendationType = 'patch';
+  let recommendationTitle = 'Targeted Responsive Remediation';
+  let recommendationReason = 'Defects are localized; patching CSS layout and accessibility targets is cost-effective.';
+
+  if (score < 70 || globalDefects >= 2 || (hasLegacyDebt && score < 80)) {
+    recommendationType = 'rebuild';
+    recommendationTitle = 'Full Modern Rebuild Recommended';
+    recommendationReason = 'Defects span global templates and legacy frameworks. A clean responsive rebuild yields higher long-term ROI than recurring CSS patches.';
+  }
+
+  return {
+    estimatedHours,
+    recommendationType,
+    recommendationTitle,
+    recommendationReason,
+    hasLegacyDebt,
   };
 }
