@@ -140,7 +140,7 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
           <h3>SEO &amp; Brand Previews</h3>
           <div class="val" style="font-size: 0.95rem;">
             ${run.siteProfile.socialSharing?.hasOpenGraph ? '<span style="color:#10b981;">✓ Rich OpenGraph Cards</span>' : '<span style="color:#f59e0b;">⚠️ Missing og:image Card</span>'}
-            <small style="font-size: 0.75rem; display: block; color: var(--muted);">${run.siteProfile.socialSharing?.hasCanonical ? '✓ Canonical URL Set' : '⚠️ No Canonical URL'}</small>
+            <small style="font-size: 0.75rem; display: block; color: var(--muted);">${run.siteProfile.socialSharing?.hasCanonical ? '✓ Canonical URL' : '⚠️ No Canonical'} · ${run.siteProfile.codeHygiene?.missingAltImagesTotal > 0 ? `⚠️ ${run.siteProfile.codeHygiene.missingAltImagesTotal} Img Missing Alt` : '✓ Alt Tags'}</small>
           </div>
         </div>
       </div>

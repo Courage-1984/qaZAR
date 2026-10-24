@@ -125,6 +125,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Scraped and verified domain ownership contacts (public emails, phones, social links) displayed in executive reports (`reportGenerator.js`).
 - [x] Modularized report CSS styles into dedicated `reportStyles.js` to preserve strict file size caps (<250 lines).
 
+### 23. Code Hygiene & Accessibility Debt Profiling (Completed)
+- [x] Detected deprecated HTML legacy tags (`<center>`, `<font>`, `<marquee>`) and missing image `alt` descriptions during crawl (`siteProfiler.js`).
+- [x] Incorporated code hygiene indicators and favicon checks into remediation roadmap and rebuild ROI scoring (`scoreCalculator.js`, `reportGenerator.js`).
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)

@@ -53,6 +53,11 @@ export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, hea
       phones: [],
       socials: [],
     },
+    codeHygiene: {
+      legacyTags: (html.match(/<(?:center|font|marquee|blink)\b/gi) || []).length,
+      missingAltImages: (html.match(/<img(?![^>]*\balt\s*=)[^>]*>/gi) || []).length,
+      hasFavicon: /<link\s[^>]*rel\s*=\s*["'](?:shortcut )?icon["']/i.test(html),
+    },
   };
 
   // 1. Meta & SEO hygiene
@@ -144,6 +149,7 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
     seoScore: 100,
     security: { isHttps: true, hasHsts: true, hasCsp: true, score: 100, flags: [] },
     assetHygiene: { uncompressedCount: 0, unlazyImagesTotal: 0, blockingScriptsTotal: 0, webFontsTotal: 0 },
+    codeHygiene: { legacyTagsTotal: 0, missingAltImagesTotal: 0, hasFavicon: true },
     socialSharing: { hasOpenGraph: true, hasCanonical: true },
     funnel: {
       hasPricing: false,
@@ -182,6 +188,11 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
       profile.assetHygiene.unlazyImagesTotal += s.performance.unlazyImages || 0;
       profile.assetHygiene.blockingScriptsTotal += s.performance.renderBlockingScripts || 0;
       profile.assetHygiene.webFontsTotal += s.performance.webFonts || 0;
+    }
+    if (s.codeHygiene) {
+      profile.codeHygiene.legacyTagsTotal += s.codeHygiene.legacyTags || 0;
+      profile.codeHygiene.missingAltImagesTotal += s.codeHygiene.missingAltImages || 0;
+      if (!s.codeHygiene.hasFavicon) profile.codeHygiene.hasFavicon = false;
     }
     if (s.funnel) {
       if (s.funnel.isPricing) profile.funnel.hasPricing = true;
@@ -222,6 +233,7 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
       flags: profile.security.flags,
     },
     assetHygiene: profile.assetHygiene,
+    codeHygiene: profile.codeHygiene,
     socialSharing: profile.socialSharing,
     funnel: profile.funnel,
   };

@@ -156,6 +156,8 @@ test('extractCrawlSignals detects tech stack, viewport meta, and lead contacts',
         <script src="https://www.googletagmanager.com/gtm.js"></script>
       </head>
       <body>
+        <center>Legacy layout</center>
+        <img src="product.jpg">
         <form action="https://shop.com/subscribe"><input type="email" name="email"><button>Join</button></form>
         <a href="mailto:founder@shop.com">Contact Us</a>
         <a href="tel:+15551234567">Call Us</a>
@@ -175,6 +177,8 @@ test('extractCrawlSignals detects tech stack, viewport meta, and lead contacts',
   assert.equal(signals.security.hasHsts, true);
   assert.equal(signals.performance.compressed, true);
   assert.equal(signals.performance.renderBlockingScripts, 2);
+  assert.equal(signals.codeHygiene.missingAltImages, 1);
+  assert.equal(signals.codeHygiene.legacyTags, 1);
   assert.equal(signals.funnel.hasLeadForm, true);
   assert.ok(signals.techStack.includes('Shopify'));
   assert.ok(signals.techStack.includes('Google Analytics/GTM'));
@@ -189,6 +193,8 @@ test('extractCrawlSignals detects tech stack, viewport meta, and lead contacts',
   assert.equal(profile.security.score, 100);
   assert.equal(profile.assetHygiene.uncompressedCount, 0);
   assert.equal(profile.assetHygiene.blockingScriptsTotal, 2);
+  assert.equal(profile.codeHygiene.missingAltImagesTotal, 1);
+  assert.equal(profile.codeHygiene.legacyTagsTotal, 1);
   assert.equal(profile.funnel.hasLeadForm, true);
   assert.equal(profile.funnel.hasContact, true);
   assert.equal(profile.funnel.brokenLinks.length, 1);

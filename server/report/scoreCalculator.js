@@ -147,10 +147,13 @@ export function generateActionRoadmap(run, categories = {}, clusters = []) {
   if (p.assetHygiene?.unlazyImagesTotal > 3) quickWins.push(`Add loading="lazy" across ${p.assetHygiene.unlazyImagesTotal} off-screen image(s).`);
   if (p.hasMissingViewportMeta) quickWins.push('Add standard mobile viewport meta tag for responsive scaling.');
   if (p.socialSharing && !p.socialSharing.hasOpenGraph) quickWins.push('Add OpenGraph metadata (og:title, og:image) to prevent unbranded links on LinkedIn and Slack.');
+  if (p.codeHygiene?.missingAltImagesTotal > 0) quickWins.push(`Add alt text to ${p.codeHygiene.missingAltImagesTotal} image(s) for WCAG accessibility compliance.`);
+  if (p.codeHygiene && !p.codeHygiene.hasFavicon) quickWins.push('Add high-resolution favicon and Apple touch icon for branded browser tabs.');
 
   if (categories.mobileTouch > 0) coreUx.push(`Enlarge ${categories.mobileTouch} touch target(s) to meet the 48x48px accessibility minimum.`);
   if (categories.overflowBreakage > 0) coreUx.push(`Constrain ${categories.overflowBreakage} layout element(s) causing horizontal viewport overflow.`);
   if (categories.wcagContrast > 0) coreUx.push(`Adjust colors for ${categories.wcagContrast} text element(s) failing WCAG AA 4.5:1 contrast.`);
+  if (p.codeHygiene?.legacyTagsTotal > 0) coreUx.push(`Replace ${p.codeHygiene.legacyTagsTotal} deprecated HTML tag(s) (<center>, <font>) with modern CSS.`);
 
   const globalCount = clusters.filter((c) => c.isGlobal).length;
   if (globalCount > 0) strategic.push(`Refactor ${globalCount} shared component(s) causing systemic multi-page breakage.`);
@@ -162,7 +165,7 @@ export function generateActionRoadmap(run, categories = {}, clusters = []) {
 export function estimateRemediationRoi(run, score, distinctErrors, distinctWarnings, globalDefects) {
   const totalPages = run.pages?.length || 1;
   const techStack = run.siteProfile?.techStack || [];
-  const hasLegacyDebt = techStack.some((t) => t.includes('Legacy') || t.includes('WordPress'));
+  const hasLegacyDebt = techStack.some((t) => t.includes('Legacy') || t.includes('WordPress')) || Boolean(run.siteProfile?.codeHygiene?.legacyTagsTotal > 0);
   const multiplier = hasLegacyDebt ? 1.25 : 1.0;
 
   let estimatedHours = 0;
