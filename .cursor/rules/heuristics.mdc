@@ -1,0 +1,7 @@
+---
+description: Rules for the DOM heuristic evaluator
+globs: server/heuristics/**/*.js
+alwaysApply: false
+---
+
+Follow `.agents/rules/heuristics.md`. Key point: `evaluate()` runs via `page.evaluate`, so it must contain all helpers inside its own body and reference no outer scope or imports.

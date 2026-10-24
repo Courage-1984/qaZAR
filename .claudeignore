@@ -1,0 +1,11 @@
+node_modules/
+data/
+web/dist/
+package-lock.json
+*.png
+*.webp
+*.log
+.env
+.claude/worktrees/
+Agentic Governance Refactoring Protocol*.md
+Claude Code - agentic configuration files.md

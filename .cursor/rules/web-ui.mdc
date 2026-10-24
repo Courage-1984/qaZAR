@@ -1,0 +1,7 @@
+---
+description: Rules for the static web UI
+globs: web/**/*
+alwaysApply: false
+---
+
+Follow `.agents/rules/web-ui.md`: vanilla JS/CSS only, escape API strings with `esc()`, accessible labels and >=48px targets, relative asset paths (GitHub Pages subpath).
