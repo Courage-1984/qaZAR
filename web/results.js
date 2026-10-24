@@ -24,7 +24,10 @@ async function renderList() {
         <td>${r.progress.pagesDone}/${r.progress.pagesTotal}</td>
         <td>${r.summary ? r.summary.violations.error : '–'}</td>
         <td>${r.summary ? r.summary.changed : '–'}</td>
-        <td><button class="btn sm danger" data-del="${esc(r.id)}" aria-label="Delete run ${esc(r.id)}">Delete</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">No runs yet. <a href="./index.html">Start one</a>.</td></tr>'}
+        <td>
+          <a class="btn sm" href="${api.reportUrl(r.id, true)}" download title="Download Executive Report">Report</a>
+          <button class="btn sm danger" data-del="${esc(r.id)}" aria-label="Delete run ${esc(r.id)}">Delete</button>
+        </td></tr>`).join('') || '<tr><td colspan="7" class="muted">No runs yet. <a href="./index.html">Start one</a>.</td></tr>'}
       </tbody></table></div>`;
     app.querySelectorAll('[data-del]').forEach((b) =>
       b.addEventListener('click', async () => {
@@ -73,12 +76,23 @@ function renderDetail(run) {
       <div class="stat"><b>${run.progress.pagesDone}/${run.progress.pagesTotal}</b><small>pages</small></div>
       ${s ? `<div class="stat"><b>${s.violations.error}</b><small>errors</small></div><div class="stat"><b>${s.violations.warn}</b><small>warnings</small></div><div class="stat"><b>${s.changed}</b><small>visual changes</small></div><div class="stat"><b>${s.new}</b><small>new baselines</small></div>` : ''}
     </div>
+    <div class="row" style="margin: 1rem 0; gap: 0.5rem; flex-wrap: wrap;">
+      <a class="btn primary" href="${api.reportUrl(run.id, true)}" download>📥 Download Executive Report</a>
+      <a class="btn" href="${api.reportUrl(run.id, false)}" target="_blank" rel="noopener">👁️ View Report</a>
+      ${run.status === 'done' ? '<button class="btn" id="promote-all">Set all captures as baseline</button>' : ''}
+    </div>
+    ${run.status === 'done' ? `
+      <div class="card" style="border: 1px solid rgba(99,102,241,0.3); background: rgba(99,102,241,0.06); margin-bottom: 1.5rem;">
+        <h3 style="color: #818cf8; margin-bottom: 0.25rem;">Turn Audit Findings Into High-Converting UX</h3>
+        <p class="muted sm" style="margin-bottom: 0.75rem;">Download the executive report above for a client-ready assessment, or request a complete code remediation plan to resolve all mobile and accessibility defects.</p>
+        <a class="btn sm primary" href="${api.reportUrl(run.id, false)}" target="_blank">View Client-Ready Executive Report →</a>
+      </div>
+    ` : ''}
     ${run.error ? `<p class="msg bad">${esc(run.error)}</p>` : ''}
     ${active ? '<div class="bar"><i style="width:' + (run.progress.pagesTotal ? (run.progress.pagesDone / run.progress.pagesTotal) * 100 : 5) + '%"></i></div>' : ''}
     ${run.pages.length ? `<div class="card scroll"><table class="tbl matrix" id="matrix"><thead><tr><th>Page</th>${VPS.map((v) => `<th>${v}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>
       <p class="muted sm">E = errors, W = warnings, dashed outline = visual change vs baseline. Click a cell for details.</p></div>` : ''}
-    <div id="detail"></div>
-    ${run.status === 'done' ? '<button class="btn" id="promote-all">Set all captures as baseline</button>' : ''}`;
+    <div id="detail"></div>`;
   app.querySelectorAll('.cell').forEach((b) =>
     b.addEventListener('click', () => {
       selected = { slug: b.dataset.slug, vp: b.dataset.vp };

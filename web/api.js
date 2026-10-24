@@ -22,6 +22,7 @@ export const api = {
   promote: (id, body = {}) => req(`/api/runs/${encodeURIComponent(id)}/baseline`, { method: 'POST', body: JSON.stringify(body) }),
   artifact: (runId, rel) => `${getApiBase()}/api/artifacts/${encodeURIComponent(runId)}/${rel.split('/').map(encodeURIComponent).join('/')}`,
   eventsUrl: (id) => `${getApiBase()}/api/runs/${encodeURIComponent(id)}/events`,
+  reportUrl: (id, download = false) => `${getApiBase()}/api/runs/${encodeURIComponent(id)}/report${download ? '?download=1' : ''}`,
 };
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);

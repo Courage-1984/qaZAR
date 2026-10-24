@@ -3,6 +3,7 @@ import { createRun, getRun, listRuns, removeRun, runPath, save, subscribe } from
 import { cancelRun, enqueue } from '../queue/jobQueue.js';
 import { promoteRun } from '../visual/baseline.js';
 import { validateRunInput } from './validate.js';
+import { generateExecutiveReport } from '../report/reportGenerator.js';
 
 export const runsRouter = Router();
 
@@ -24,6 +25,18 @@ runsRouter.get('/:id', (req, res) => {
   run ? res.json(run) : res.status(404).json({ error: 'Run not found' });
 });
 
+runsRouter.get('/:id/report', (req, res) => {
+  const run = getRun(req.params.id);
+  if (!run) return res.status(404).json({ error: 'Run not found' });
+  const html = generateExecutiveReport(run);
+  if (req.query.download === '1') {
+    const safeDomain = run.input?.domain?.replace(/https?:\/\//, '').replace(/[^a-zA-Z0-9.-]/g, '_') || run.id;
+    res.setHeader('Content-Disposition', `attachment; filename="qaZAR-audit-${safeDomain}.html"`);
+  }
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+});
+
 runsRouter.get('/:id/events', (req, res) => {
   const run = getRun(req.params.id);
   if (!run) return res.status(404).end();
@@ -32,15 +45,13 @@ runsRouter.get('/:id/events', (req, res) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-transform',
     Connection: 'keep-alive',
-    'X-Accel-Buffering': 'no', // Disable buffering on Nginx reverse proxy
+    'X-Accel-Buffering': 'no',
   });
   res.flushHeaders?.();
 
-  // Initial event
   res.write(`data: ${JSON.stringify({ status: run.status, progress: run.progress, summary: run.summary })}\n\n`);
   subscribe(run.id, res);
 
-  // Keep-alive heartbeat every 15s for reverse proxies
   const keepAlive = setInterval(() => {
     try {
       res.write(': keep-alive\n\n');

@@ -64,6 +64,12 @@ Promote run captures to baseline.
 ### `DELETE /api/runs/:id`
 Cancel an active run and delete its artifacts.
 
+### `GET /api/runs/:id/report`
+Generates a standalone, executive-styled HTML quality assessment report.
+- Query parameter `download=1` triggers automatic file download attachment.
+- Includes executive health score (0–100), letter grade (A–F), conversion friction analysis, device matrix, and integrated lead-capture remediation CTA.
+
+
 ## Artifacts Endpoint
 
 ### `GET /api/artifacts/:runId/*`
