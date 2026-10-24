@@ -84,6 +84,11 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Scope-calibrated dev effort estimator: realistically scales hours based on actual site page count and clean architecture (e.g. 1-page sites with minor issues receive 1-2h polish, not 8h-15h inflation).
 - [x] Suppressed 0-count risk items in executive reports: non-existent liabilities are replaced with positive structural health confirmations.
 
+### 13. Asset Bloat & Commercial Intent Profiling (Completed)
+- [x] Zero-overhead render-blocking script, web font, and unlazy image detection (`siteProfiler.js`).
+- [x] Commercial form intent & insecure HTTP post detection (`siteProfiler.js`).
+- [x] Enriched asset hygiene and lead conversion cards in executive reports and UI results.
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)

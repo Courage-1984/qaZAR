@@ -85,6 +85,7 @@ function renderDetail(run) {
           <div>🛠️ <b>${esc(run.siteProfile.techStack.join(', ') || 'Custom')}</b></div>
           <div>📱 <b>${run.siteProfile.hasMissingViewportMeta ? '⚠️ Missing Viewport' : '✓ Viewport Meta'}</b></div>
           <div>🎯 <b>${[run.siteProfile.funnel?.hasPricing ? 'Pricing' : null, run.siteProfile.funnel?.hasCheckout ? 'Checkout' : null, run.siteProfile.funnel?.hasContact ? 'Contact' : null].filter(Boolean).join(' · ') || 'Brochureware'}</b></div>
+          ${run.siteProfile.assetHygiene?.blockingScriptsTotal ? `<div style="color:#f59e0b;">⚠️ <b>${run.siteProfile.assetHygiene.blockingScriptsTotal} Blocking Script(s)</b></div>` : ''}
           ${run.siteProfile.funnel?.brokenLinks?.length ? `<div style="color:#ef4444;">🚨 <b>${run.siteProfile.funnel.brokenLinks.length} Broken Link(s)</b></div>` : ''}
           ${run.siteProfile.leadContacts?.emails?.length ? `<div>✉️ <b>${esc(run.siteProfile.leadContacts.emails[0])}</b></div>` : ''}
         </div>

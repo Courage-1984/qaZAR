@@ -160,12 +160,17 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
           <div class="val" style="font-size: 1rem; ${run.siteProfile.security?.score < 80 ? 'color: #ef4444;' : 'color: #10b981;'}">${run.siteProfile.security?.score || 100}/100 <small style="font-size: 0.75rem; display:block; color:var(--muted);">${esc(run.siteProfile.security?.flags?.join(', ') || '✓ Transport Protected')}</small></div>
         </div>
         <div class="card">
-          <h3>Asset Compression</h3>
-          <div class="val" style="font-size: 1rem;">${run.siteProfile.assetHygiene?.uncompressedCount > 0 ? '⚠️ Uncompressed' : '✓ Gzip/Brotli'}</div>
+          <h3>Asset &amp; Script Hygiene</h3>
+          <div class="val" style="font-size: 0.95rem;">
+            ${run.siteProfile.assetHygiene?.blockingScriptsTotal > 0 ? `<span style="color: #f59e0b;">⚠️ ${run.siteProfile.assetHygiene.blockingScriptsTotal} Blocking Script(s)</span>` : '<span style="color: #10b981;">✓ Async/Defer Optimized</span>'}
+            <small style="font-size: 0.75rem; display: block; color: var(--muted);">${run.siteProfile.assetHygiene?.uncompressedCount > 0 ? '⚠️ Uncompressed HTML' : '✓ Gzip/Brotli'} · ${run.siteProfile.assetHygiene?.unlazyImagesTotal || 0} unlazy imgs</small>
+          </div>
         </div>
         <div class="card">
           <h3>Conversion Funnel</h3>
-          <div class="val" style="font-size: 0.95rem;">${run.siteProfile.funnel?.brokenLinks?.length > 0 ? `<span style="color:#ef4444;">🚨 ${run.siteProfile.funnel.brokenLinks.length} Broken Link(s)</span>` : `<span style="color:#10b981;">✓ ${[run.siteProfile.funnel?.hasPricing ? 'Pricing' : null, run.siteProfile.funnel?.hasCheckout ? 'Checkout' : null, run.siteProfile.funnel?.hasContact ? 'Contact' : null].filter(Boolean).join(' · ') || 'Brochureware'}</span>`}</div>
+          <div class="val" style="font-size: 0.95rem;">
+            ${run.siteProfile.funnel?.brokenLinks?.length > 0 ? `<span style="color:#ef4444;">🚨 ${run.siteProfile.funnel.brokenLinks.length} Broken Link(s)</span>` : (run.siteProfile.funnel?.insecureFormsCount > 0 ? `<span style="color:#ef4444;">⚠️ Insecure Form Post</span>` : `<span style="color:#10b981;">✓ ${[run.siteProfile.funnel?.hasLeadForm ? 'Lead Forms' : null, run.siteProfile.funnel?.hasPricing ? 'Pricing' : null, run.siteProfile.funnel?.hasCheckout ? 'Checkout' : null, run.siteProfile.funnel?.hasContact ? 'Contact' : null].filter(Boolean).join(' · ') || 'Brochureware'}</span>`)}
+          </div>
         </div>
       </div>
     </section>` : ''}

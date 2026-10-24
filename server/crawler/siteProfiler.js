@@ -34,12 +34,19 @@ export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, hea
     performance: {
       compressed: Boolean(getH('content-encoding')),
       unlazyImages: (html.match(/<img(?![^>]*\bloading\s*=\s*["']lazy["'])[^>]*>/gi) || []).length,
+      renderBlockingScripts: (() => {
+        const head = (html.match(/<head[^>]*>([\s\S]*?)<\/head>/i) || [])[1] || '';
+        return (head.match(/<script(?![^>]*\b(?:async|defer|type=["']module|type=["']application\/ld\+json))[^>]*src=[^>]*>/gi) || []).length;
+      })(),
+      webFonts: (html.match(/fonts\.(?:googleapis|gstatic)\.com|use\.typekit\.net/gi) || []).length,
     },
     funnel: {
       isPricing: /\b(pricing|plans|tier|billing|upgrade)\b/i.test(url),
       isCheckout: /\b(checkout|cart|basket|order|pay)\b/i.test(url),
       isAuth: /\b(signup|register|join|login|signin|auth)\b/i.test(url),
       isContact: /\b(contact|support|help|sales)\b/i.test(url),
+      hasLeadForm: /<form[^>]*>[\s\S]*?<input[^>]*(?:type=["'](?:email|tel)["']|name=["'](?:email|phone|contact|lead)["'])[\s\S]*?<\/form>/i.test(html),
+      insecureForms: (url.startsWith('https:') && /<form[^>]*action=["']http:\/\//i.test(html)) ? 1 : 0,
     },
     contacts: {
       emails: [],
@@ -135,12 +142,14 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
     leadContacts: { emails: new Set(), phones: new Set(), socials: new Set() },
     seoScore: 100,
     security: { isHttps: true, hasHsts: true, hasCsp: true, score: 100, flags: [] },
-    assetHygiene: { uncompressedCount: 0, unlazyImagesTotal: 0 },
+    assetHygiene: { uncompressedCount: 0, unlazyImagesTotal: 0, blockingScriptsTotal: 0, webFontsTotal: 0 },
     funnel: {
       hasPricing: false,
       hasCheckout: false,
       hasAuth: false,
       hasContact: false,
+      hasLeadForm: false,
+      insecureFormsCount: 0,
       brokenLinks: (brokenLinks || []).slice(0, 5),
     },
   };
@@ -168,22 +177,27 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
     if (s.performance) {
       if (!s.performance.compressed) profile.assetHygiene.uncompressedCount++;
       profile.assetHygiene.unlazyImagesTotal += s.performance.unlazyImages || 0;
+      profile.assetHygiene.blockingScriptsTotal += s.performance.renderBlockingScripts || 0;
+      profile.assetHygiene.webFontsTotal += s.performance.webFonts || 0;
     }
     if (s.funnel) {
       if (s.funnel.isPricing) profile.funnel.hasPricing = true;
       if (s.funnel.isCheckout) profile.funnel.hasCheckout = true;
       if (s.funnel.isAuth) profile.funnel.hasAuth = true;
       if (s.funnel.isContact) profile.funnel.hasContact = true;
+      if (s.funnel.hasLeadForm) profile.funnel.hasLeadForm = true;
+      profile.funnel.insecureFormsCount += s.funnel.insecureForms || 0;
     }
   }
 
-  if (profile.leadContacts.emails.size > 0 || profile.leadContacts.phones.size > 0) {
+  if (profile.leadContacts.emails.size > 0 || profile.leadContacts.phones.size > 0 || profile.funnel.hasLeadForm) {
     profile.funnel.hasContact = true;
   }
 
   if (!profile.security.isHttps) { profile.security.score -= 40; profile.security.flags.push('Insecure HTTP'); }
   if (!profile.security.hasHsts) { profile.security.score -= 20; profile.security.flags.push('Missing HSTS'); }
   if (!profile.security.hasCsp) { profile.security.score -= 15; profile.security.flags.push('Missing CSP'); }
+  if (profile.funnel.insecureFormsCount > 0) { profile.security.score -= 20; profile.security.flags.push('Insecure Form Submission'); }
   profile.security.score = Math.max(25, profile.security.score);
 
   profile.avgResponseTimeMs = Math.round(totalTime / pageSignals.length);
