@@ -138,9 +138,10 @@ export async function processRun(runId) {
   try {
     run.status = 'crawling';
     save(run);
-    const { urls, source } = await buildQueue(run.input);
+    const { urls, source, siteProfile } = await buildQueue(run.input);
     if (!urls.length) throw new Error('No pages found (sitemap empty and crawl found nothing)');
     run.crawlSource = source;
+    run.siteProfile = siteProfile || null;
     run.pages = urls.map((url) => ({ url, slug: slugFor(url), viewports: {} }));
     run.progress = { pagesDone: 0, pagesTotal: urls.length };
     run.status = 'capturing';

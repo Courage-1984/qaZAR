@@ -50,11 +50,23 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Added deployment guide (`docs/deployment.md`) with Caddy and Nginx reverse proxy configurations with automatic SSL.
 - [x] Modular documentation suite under `docs/` (`architecture.md`, `crawler-roi.md`, `api.md`, `deployment.md`).
 
-### 7. False-Positive Tuning (In Progress)
-- [ ] Flag contrast over background images, linear gradients, or video backgrounds as `indeterminate` rather than silently skipping.
-- [ ] Optimize collision algorithm to sample beyond the top ~35 elements safely.
-- [ ] Refine `nav-collapse` selector heuristics to support custom hamburger toggle components.
-- [ ] Expand cross-viewport scaling heuristics beyond desktop vs. mobile H1 comparison.
+### 7. False-Positive Tuning & Heuristic Robustness (Completed)
+- [x] Flag contrast over background images, linear gradients, or video backgrounds as `wcag-contrast-indeterminate` with `severity: 'info'`.
+- [x] Expanded collision detection sampling to top 60 interactive/content elements with viewport-intersection filtering.
+- [x] Refined `nav-collapse` selector heuristics with bypass for scrollable chip/tag carousels.
+- [x] Expanded cross-viewport scaling heuristics covering H1 and H2 scale down checks + mobile undersized warnings.
+
+### 8. Crawl Intelligence, Cheap ROI State & Hot Lead Capture (Completed)
+- [x] Zero-overhead page profiling during crawl (`server/crawler/siteProfiler.js`): TTFB response time, HTML byte size, viewport meta detection, tech stack fingerprinting (WordPress, Shopify, Webflow, Next.js, React, Nuxt, jQuery, GTM, Meta Pixel).
+- [x] Non-invasive lead contact scraping: public email, phone, and social profile discovery.
+- [x] Executive UX/UI Audit Report HTML generator (`server/report/reportGenerator.js`): standalone, print-ready, high-trust 0-100 score + letter grade with remediation quote lead capture CTA.
+- [x] Integrated Crawl & Lead Intelligence badge strip in `web/results.js` (latency, tech stack, mobile viewport check, lead email).
+- [x] Unit test suite for site profiler and lead signal aggregation in `server/test/unit.test.js`.
+
+### 9. Crawler & Report Iteration with MVP Progress Markers (Active / Next)
+- [ ] Granular crawl progress markers streamed over SSE (`crawling:sitemap`, `crawling:bfs`, `crawling:profiling`, `crawling:prioritizing`).
+- [ ] Expose ROI score breakdown and commercial weight factors in UI run view.
+- [ ] Exportable JSON summary and customizable lead capture agency email in report generator.
 
 ---
 

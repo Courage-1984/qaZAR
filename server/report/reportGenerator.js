@@ -51,66 +51,16 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Executive UX/UI Quality &amp; Responsive Audit – ${esc(domain)}</title>
   <style>
-    :root {
-      --bg: #090d16;
-      --card: #111827;
-      --border: #1f2937;
-      --text: #f3f4f6;
-      --muted: #9ca3af;
-      --accent: #6366f1;
-      --grade: ${gradeColor};
-    }
+    :root { --bg: #090d16; --card: #111827; --border: #1f2937; --text: #f3f4f6; --muted: #9ca3af; --accent: #6366f1; --grade: ${gradeColor}; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      line-height: 1.5;
-      padding: 2rem 1rem;
-    }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.5; padding: 2rem 1rem; }
     .wrapper { max-width: 860px; margin: 0 auto; }
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 1.5rem;
-      margin-bottom: 2rem;
-    }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; margin-bottom: 2rem; }
     .brand { font-size: 1.25rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
     .brand span { color: var(--accent); }
-    .badge-report {
-      background: rgba(99,102,241,0.15);
-      color: #818cf8;
-      font-size: 0.75rem;
-      font-weight: 600;
-      padding: 0.25rem 0.6rem;
-      border-radius: 9999px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .hero {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 2rem;
-      margin-bottom: 2rem;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 2rem;
-    }
-    .grade-circle {
-      width: 100px;
-      height: 100px;
-      border-radius: 50%;
-      border: 4px solid var(--grade);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
+    .badge-report { background: rgba(99,102,241,0.15); color: #818cf8; font-size: 0.75rem; font-weight: 600; padding: 0.25rem 0.6rem; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .hero { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; display: flex; flex-wrap: wrap; align-items: center; gap: 2rem; }
+    .grade-circle { width: 100px; height: 100px; border-radius: 50%; border: 4px solid var(--grade); display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
     .grade-val { font-size: 2.25rem; font-weight: 800; color: var(--grade); line-height: 1; }
     .grade-score { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
     .hero-summary h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
@@ -121,35 +71,13 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
     .card .val { font-size: 1.5rem; font-weight: 700; }
     .impact-section { margin-bottom: 2rem; }
     .impact-section h2 { font-size: 1.25rem; margin-bottom: 1rem; }
-    .risk-item {
-      background: var(--card);
-      border-left: 4px solid var(--accent);
-      padding: 1rem;
-      border-radius: 0 8px 8px 0;
-      margin-bottom: 0.75rem;
-    }
+    .risk-item { background: var(--card); border-left: 4px solid var(--accent); padding: 1rem; border-radius: 0 8px 8px 0; margin-bottom: 0.75rem; }
     .risk-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.25rem; }
     .risk-desc { font-size: 0.85rem; color: var(--muted); }
-    .cta-card {
-      background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.12));
-      border: 1px solid rgba(99,102,241,0.3);
-      border-radius: 12px;
-      padding: 2.25rem;
-      text-align: center;
-      margin-top: 2.5rem;
-    }
+    .cta-card { background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(168,85,247,0.12)); border: 1px solid rgba(99,102,241,0.3); border-radius: 12px; padding: 2.25rem; text-align: center; margin-top: 2.5rem; }
     .cta-card h2 { font-size: 1.5rem; margin-bottom: 0.75rem; }
     .cta-card p { color: var(--muted); max-width: 600px; margin: 0 auto 1.5rem auto; font-size: 0.95rem; }
-    .btn-cta {
-      display: inline-block;
-      background: var(--accent);
-      color: #fff;
-      font-weight: 600;
-      padding: 0.85rem 1.75rem;
-      border-radius: 8px;
-      text-decoration: none;
-      transition: opacity 0.15s;
-    }
+    .btn-cta { display: inline-block; background: var(--accent); color: #fff; font-weight: 600; padding: 0.85rem 1.75rem; border-radius: 8px; text-decoration: none; transition: opacity 0.15s; }
     .btn-cta:hover { opacity: 0.9; }
     .footer { text-align: center; margin-top: 3rem; color: var(--muted); font-size: 0.8rem; }
     @media print {
@@ -217,6 +145,29 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
         <div class="risk-desc">Text elements failing WCAG AA contrast ratios (4.5:1) expose digital properties to European and US accessibility liability (ADA/EAA).</div>
       </div>
     </section>
+
+    ${run.siteProfile ? `
+    <section class="impact-section">
+      <h2>Technical Stack &amp; Infrastructure Profile</h2>
+      <div class="grid" style="margin-bottom: 1rem;">
+        <div class="card">
+          <h3>Server Latency</h3>
+          <div class="val" style="${run.siteProfile.avgResponseTimeMs > 1000 ? 'color: #ef4444;' : 'color: #10b981;'}">${run.siteProfile.avgResponseTimeMs}ms</div>
+        </div>
+        <div class="card">
+          <h3>Detected Stack</h3>
+          <div class="val" style="font-size: 1rem; font-weight: 600;">${esc(run.siteProfile.techStack.join(', ') || 'Custom / Jamstack')}</div>
+        </div>
+        <div class="card">
+          <h3>Mobile Viewport Meta</h3>
+          <div class="val" style="font-size: 1rem;">${run.siteProfile.hasMissingViewportMeta ? '⚠️ Missing' : '✓ Configured'}</div>
+        </div>
+        <div class="card">
+          <h3>SEO Hygiene Score</h3>
+          <div class="val">${run.siteProfile.seoScore}/100</div>
+        </div>
+      </div>
+    </section>` : ''}
 
     ${sampleIssues.length ? `
     <section class="impact-section">

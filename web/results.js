@@ -76,6 +76,17 @@ function renderDetail(run) {
       <div class="stat"><b>${run.progress.pagesDone}/${run.progress.pagesTotal}</b><small>pages</small></div>
       ${s ? `<div class="stat"><b>${s.violations.error}</b><small>errors</small></div><div class="stat"><b>${s.violations.warn}</b><small>warnings</small></div><div class="stat"><b>${s.changed}</b><small>visual changes</small></div><div class="stat"><b>${s.new}</b><small>new baselines</small></div>` : ''}
     </div>
+    ${run.siteProfile ? `
+      <div class="card" style="margin-bottom: 1rem; padding: 0.75rem 1rem;">
+        <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.25rem;">Crawl &amp; Lead Intelligence</div>
+        <div class="row" style="gap: 1.5rem; flex-wrap: wrap; font-size: 0.85rem;">
+          <div>⏱️ <b>${run.siteProfile.avgResponseTimeMs}ms</b> latency</div>
+          <div>🛠️ <b>${esc(run.siteProfile.techStack.join(', ') || 'Custom')}</b></div>
+          <div>📱 <b>${run.siteProfile.hasMissingViewportMeta ? '⚠️ Missing Viewport' : '✓ Viewport Meta'}</b></div>
+          ${run.siteProfile.leadContacts?.emails?.length ? `<div>✉️ <b>${esc(run.siteProfile.leadContacts.emails[0])}</b></div>` : ''}
+        </div>
+      </div>
+    ` : ''}
     <div class="row" style="margin: 1rem 0; gap: 0.5rem; flex-wrap: wrap;">
       <a class="btn primary" href="${api.reportUrl(run.id, true)}" download>📥 Download Executive Report</a>
       <a class="btn" href="${api.reportUrl(run.id, false)}" target="_blank" rel="noopener">👁️ View Report</a>

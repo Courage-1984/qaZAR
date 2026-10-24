@@ -2,6 +2,7 @@ import { normalizeUrl, isAssetUrl, sameOrigin } from './normalize.js';
 import { collectSitemapUrls, discoverSitemaps } from './sitemap.js';
 import { extractLinksHeadless } from './headlessCrawl.js';
 import { selectTopRoiCandidates } from './roiScorer.js';
+import { extractCrawlSignals, aggregateSiteProfile } from './siteProfiler.js';
 
 /** Extract same-origin hrefs from HTML (regex; fast for static discovery). */
 export function extractLinks(html, baseUrl) {
@@ -15,25 +16,29 @@ export function extractLinks(html, baseUrl) {
 
 /**
  * Breadth-first crawl from a starting URL.
- * Automatically falls back to headless JS link extraction for client-side rendered SPAs.
+ * Extracts lightweight performance, tech stack, and lead signals on the fly.
  */
 async function bfs(start, max, { renderJs = false } = {}) {
   const seen = new Set([start]);
   const queue = [start];
   const discovered = [];
+  const pageSignals = [];
 
   while (queue.length && discovered.length < max * 2) {
     const url = queue.shift();
     try {
       let links = [];
+      const t0 = performance.now();
       const res = await fetch(url, {
         headers: { 'user-agent': 'qaZAR/0.1' },
         signal: AbortSignal.timeout(15000),
       });
+      const elapsed = Math.round(performance.now() - t0);
 
       if (res.ok && (res.headers.get('content-type') || '').includes('html')) {
         discovered.push(url);
         const html = await res.text();
+        pageSignals.push(extractCrawlSignals(html, url, elapsed));
         links = extractLinks(html, url);
 
         // If static extraction found no links on start page, or renderJs requested -> try headless
@@ -54,13 +59,15 @@ async function bfs(start, max, { renderJs = false } = {}) {
     }
   }
 
-  return selectTopRoiCandidates(discovered, max);
+  const urls = selectTopRoiCandidates(discovered, max);
+  const siteProfile = aggregateSiteProfile(pageSignals);
+  return { urls, siteProfile };
 }
 
 /**
  * Build the page queue: explicit sitemap -> auto-discovered sitemap -> BFS.
- * Applies ROI ranking to guarantee high-value, diverse UX templates.
- * Returns { urls, source }.
+ * Applies ROI ranking and profiles site technical debt and lead intelligence.
+ * Returns { urls, source, siteProfile }.
  */
 export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs = false }) {
   const start = normalizeUrl(domain);
@@ -79,9 +86,24 @@ export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs
   const uniq = [...new Set(sitemapUrls)];
   if (uniq.length) {
     const prioritized = selectTopRoiCandidates(uniq, max_pages);
-    return { urls: prioritized, source: 'sitemap' };
+    // Cheap root fetch for tech stack and lead contact extraction on sitemap runs
+    const pageSignals = [];
+    try {
+      const t0 = performance.now();
+      const res = await fetch(start, {
+        headers: { 'user-agent': 'qaZAR/0.1' },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res.ok) {
+        const html = await res.text();
+        pageSignals.push(extractCrawlSignals(html, start, Math.round(performance.now() - t0)));
+      }
+    } catch {
+      /* skip */
+    }
+    return { urls: prioritized, source: 'sitemap', siteProfile: aggregateSiteProfile(pageSignals) };
   }
 
-  const crawled = await bfs(start, max_pages, { renderJs });
-  return { urls: crawled.length ? crawled : [start], source: 'crawl' };
+  const { urls, siteProfile } = await bfs(start, max_pages, { renderJs });
+  return { urls: urls.length ? urls : [start], source: 'crawl', siteProfile };
 }

@@ -116,5 +116,39 @@ test('generateExecutiveReport produces standalone HTML with lead generation CTA'
   assert.ok(html.includes('mailto:leads@agency.com'));
 });
 
+test('extractCrawlSignals detects tech stack, viewport meta, and lead contacts', async () => {
+  const { extractCrawlSignals, aggregateSiteProfile } = await import('../crawler/siteProfiler.js');
+  const sampleHtml = `
+    <html>
+      <head>
+        <title>Shop Demo</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="E-commerce store">
+        <script src="https://cdn.shopify.com/s/files/1/theme.js"></script>
+        <script src="https://www.googletagmanager.com/gtm.js"></script>
+      </head>
+      <body>
+        <a href="mailto:founder@shop.com">Contact Us</a>
+        <a href="tel:+15551234567">Call Us</a>
+        <a href="https://linkedin.com/company/shopdemo">LinkedIn</a>
+      </body>
+    </html>
+  `;
+  const signals = extractCrawlSignals(sampleHtml, 'https://shop.com/', 120);
+  assert.equal(signals.hasViewportMeta, true);
+  assert.equal(signals.hasTitle, true);
+  assert.ok(signals.techStack.includes('Shopify'));
+  assert.ok(signals.techStack.includes('Google Analytics/GTM'));
+  assert.ok(signals.contacts.emails.includes('founder@shop.com'));
+  assert.ok(signals.contacts.phones.includes('+15551234567'));
+  assert.ok(signals.contacts.socials.some((s) => s.includes('linkedin.com')));
+
+  const profile = aggregateSiteProfile([signals]);
+  assert.equal(profile.avgResponseTimeMs, 120);
+  assert.equal(profile.hasMissingViewportMeta, false);
+  assert.ok(profile.techStack.includes('Shopify'));
+  assert.ok(profile.leadContacts.emails.includes('founder@shop.com'));
+});
+
 
 
