@@ -26,6 +26,8 @@ jobs:
           node --check server/heuristics/evaluate.js
           node --check server/crawler/crawl.js
           node --check server/crawler/roiScorer.js
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
       - name: Unit Tests
         run: npm test
       - name: Web UI Build
