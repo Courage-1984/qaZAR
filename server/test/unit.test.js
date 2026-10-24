@@ -129,6 +129,7 @@ test('generateExecutiveReport produces standalone HTML with lead generation CTA'
   assert.ok(html.includes('<!doctype html>'));
   assert.ok(html.includes('client-site.com'));
   assert.ok(html.includes('Engineering Remediation vs. Rebuild Assessment'));
+  assert.ok(html.includes('Print / Save PDF'));
   assert.ok(html.includes('Request Full Remediation Plan'));
   assert.ok(html.includes('mailto:leads@agency.com'));
 });

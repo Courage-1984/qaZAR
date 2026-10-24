@@ -64,11 +64,14 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
     .cta-card p { color: var(--muted); max-width: 600px; margin: 0 auto 1.5rem auto; font-size: 0.95rem; }
     .btn-cta { display: inline-block; background: var(--accent); color: #fff; font-weight: 600; padding: 0.85rem 1.75rem; border-radius: 8px; text-decoration: none; transition: opacity 0.15s; }
     .btn-cta:hover { opacity: 0.9; }
+    .btn-print { background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: #fff; padding: 0.35rem 0.8rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: background 0.15s; }
+    .btn-print:hover { background: rgba(255,255,255,0.16); }
     .footer { text-align: center; margin-top: 3rem; color: var(--muted); font-size: 0.8rem; }
     @media print {
-      body { background: #fff; color: #000; }
-      .hero, .card, .risk-item, .cta-card { background: #f9f9f9; border-color: #ddd; color: #000; }
+      body { background: #fff; color: #000; padding: 0; }
+      .hero, .card, .risk-item, .cta-card { background: #f9f9f9; border-color: #ddd; color: #000; page-break-inside: avoid; }
       .btn-cta { border: 1px solid #000; background: none; color: #000; }
+      .btn-print { display: none !important; }
     }
   </style>
 </head>
@@ -79,7 +82,8 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
         <div class="brand"><span>qa</span>ZAR Executive Audit</div>
         <div style="font-size: 0.9rem; color: var(--muted); margin-top: 4px;">Target: <b>${esc(domain)}</b></div>
       </div>
-      <div>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
         <span class="badge-report">${esc(dateStr)}</span>
       </div>
     </div>
@@ -150,6 +154,10 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
         <div class="card">
           <h3>Asset Compression</h3>
           <div class="val" style="font-size: 1rem;">${run.siteProfile.assetHygiene?.uncompressedCount > 0 ? '⚠️ Uncompressed' : '✓ Gzip/Brotli'}</div>
+        </div>
+        <div class="card">
+          <h3>Conversion Funnel</h3>
+          <div class="val" style="font-size: 0.95rem;">${run.siteProfile.funnel?.brokenLinks?.length > 0 ? `<span style="color:#ef4444;">🚨 ${run.siteProfile.funnel.brokenLinks.length} Broken Link(s)</span>` : `<span style="color:#10b981;">✓ ${[run.siteProfile.funnel?.hasPricing ? 'Pricing' : null, run.siteProfile.funnel?.hasCheckout ? 'Checkout' : null, run.siteProfile.funnel?.hasContact ? 'Contact' : null].filter(Boolean).join(' · ') || 'Brochureware'}</span>`}</div>
         </div>
       </div>
     </section>` : ''}

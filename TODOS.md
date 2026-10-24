@@ -74,6 +74,11 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Zero-overhead transport security (HTTPS, HSTS, CSP) and asset compression (Gzip/Brotli) profiling (`server/crawler/siteProfiler.js`).
 - [x] Engineering Remediation vs. Rebuild ROI Calculator (`estimateRemediationRoi`) in executive reports and lead capture emails.
 
+### 11. Conversion Funnel Integrity & Print-Ready Export (Completed)
+- [x] Conversion funnel classification (`siteProfiler.js`): tracks pricing, checkout, auth, and contact coverage.
+- [x] Zero-cost broken link detection during BFS and sitemap discovery.
+- [x] Print & PDF export engine in `reportGenerator.js` with page-break protection and one-click print button.
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)
