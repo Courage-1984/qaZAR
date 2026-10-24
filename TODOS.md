@@ -121,6 +121,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Documented JSON executive report schema (`GET /api/runs/:id/report?format=json`) in `docs/api.md`.
 - [x] Documented lead capture customization (`?email=`) and automated download parameters (`?download=1`).
 
+### 22. Verified Domain Ownership & Lead Contact Dossier (Completed)
+- [x] Scraped and verified domain ownership contacts (public emails, phones, social links) displayed in executive reports (`reportGenerator.js`).
+- [x] Modularized report CSS styles into dedicated `reportStyles.js` to preserve strict file size caps (<250 lines).
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)
