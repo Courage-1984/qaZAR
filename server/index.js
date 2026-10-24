@@ -36,7 +36,13 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 
+import fs from 'node:fs';
 import os from 'node:os';
+import { startPublicTunnel } from './tunnel.js';
+
+const webDist = path.resolve('web/dist');
+const webDir = path.resolve('web');
+app.use(express.static(fs.existsSync(webDist) ? webDist : webDir));
 
 function getLocalIp() {
   try {
@@ -54,11 +60,22 @@ function getLocalIp() {
 
 await ensurePortFree(config.port);
 const host = config.host || '0.0.0.0';
-const server = app.listen(config.port, host, () => {
+const server = app.listen(config.port, host, async () => {
   const localIp = getLocalIp();
   console.log(`qaZAR API listening on http://localhost:${config.port}`);
   if (localIp) {
     console.log(`qaZAR Mobile/LAN access: http://${localIp}:${config.port}`);
+  }
+  if (config.tunnel) {
+    console.log('[qaZAR Tunnel] Starting public Cloudflare HTTPS tunnel...');
+    const t = await startPublicTunnel(config.port);
+    if (t?.url) {
+      console.log(`\n================================================================`);
+      console.log(`qaZAR Public HTTPS (Mobile & Outside Network): ${t.url}`);
+      console.log(`Direct Mobile Access: ${t.url}`);
+      console.log(`GitHub Pages Auto-Link: https://courage-1984.github.io/qaZAR/?api=${encodeURIComponent(t.url)}`);
+      console.log(`================================================================\n`);
+    }
   }
 });
 

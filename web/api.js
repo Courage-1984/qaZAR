@@ -2,18 +2,24 @@ const KEY = 'qazar.apiBase';
 
 export const getApiBase = () => {
   if (typeof location !== 'undefined') {
-    const qApi = new URLSearchParams(location.search).get('api');
+    const qApi = new URLSearchParams(location.search).get('api') || new URLSearchParams(location.hash.slice(1)).get('api');
     if (qApi) {
       localStorage.setItem(KEY, qApi.trim());
       return qApi.trim().replace(/\/+$/, '');
     }
   }
+
   const stored = localStorage.getItem(KEY);
   if (stored) return stored.replace(/\/+$/, '');
 
-  if (typeof location !== 'undefined' && location.hostname && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-    const proto = location.protocol === 'https:' ? 'https:' : 'http:';
-    return `${proto}//${location.hostname}:8787`;
+  if (typeof location !== 'undefined' && location.origin) {
+    if (!location.hostname.endsWith('github.io')) {
+      if (location.port === '8787' || !location.port) {
+        return location.origin.replace(/\/+$/, '');
+      }
+      const proto = location.protocol === 'https:' ? 'https:' : 'http:';
+      return `${proto}//${location.hostname}:8787`;
+    }
   }
   return 'http://localhost:8787';
 };

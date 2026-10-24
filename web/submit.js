@@ -6,12 +6,19 @@ const apiStatus = $('api-status');
 $('api_base').value = getApiBase();
 
 async function testApi() {
+  const base = getApiBase();
+  const isHttps = typeof location !== 'undefined' && location.protocol === 'https:';
+  const isInsecure = base.startsWith('http://');
   try {
     await api.health();
-    apiStatus.textContent = '✓ Connected to ' + getApiBase();
+    apiStatus.textContent = '✓ Connected to ' + base;
     apiStatus.className = 'msg ok';
   } catch {
-    apiStatus.textContent = '✗ Cannot reach ' + getApiBase() + ' – if testing on mobile, enter your computer LAN IP (e.g. http://192.168.x.x:8787)';
+    if (isHttps && isInsecure) {
+      apiStatus.textContent = '✗ Mixed Content: GitHub Pages (HTTPS) cannot reach insecure HTTP (' + base + '). Use an HTTPS tunnel (?api=https://...) or open the server directly on your device.';
+    } else {
+      apiStatus.textContent = '✗ Cannot reach ' + base + ' – is the server running?';
+    }
     apiStatus.className = 'msg bad';
   }
 }

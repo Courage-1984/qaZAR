@@ -6,6 +6,7 @@
   "description": "Viewport UI/UX QA & visual regression testing suite",
   "scripts": {
     "server": "node server/index.js",
+    "server:tunnel": "node server/index.js --tunnel",
     "dev:web": "vite web",
     "build:web": "vite build web",
     "preview:web": "vite preview web",

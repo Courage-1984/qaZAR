@@ -149,6 +149,11 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Bound Express server to `0.0.0.0` (configurable via `HOST`) and logged LAN IP for direct mobile device access (`config.js`, `index.js`).
 - [x] Updated client `getApiBase()` to dynamically infer mobile/LAN hostnames and support query string `?api=` configuration (`web/api.js`, `web/submit.js`).
 
+### 29. Public HTTPS Cloudflare Tunnel & Mobile GitHub Pages Detection (Completed)
+- [x] Served static web UI directly from API server (`web/dist` or `web/`) so direct mobile/LAN/tunnel URLs serve the complete client (`index.js`).
+- [x] Automated Cloudflare HTTPS Quick Tunnel (`npm run server:tunnel`, `server/tunnel.js`) to provide secure public access outside the local network.
+- [x] Excluded GitHub Pages hostnames from port 8787 guessing and added mixed content error prevention in web client (`web/api.js`, `web/submit.js`).
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)
