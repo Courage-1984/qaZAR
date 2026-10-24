@@ -9,13 +9,27 @@ async function testApi() {
   const base = getApiBase();
   const isHttps = typeof location !== 'undefined' && location.protocol === 'https:';
   const isInsecure = base.startsWith('http://');
+  apiStatus.textContent = 'Connecting to ' + base + '…';
+  apiStatus.className = 'msg';
+
   try {
     await api.health();
     apiStatus.textContent = '✓ Connected to ' + base;
     apiStatus.className = 'msg ok';
+    $('api_base').value = base;
+    return;
   } catch {
+    apiStatus.textContent = 'Auto-detecting live qaZAR server…';
+    const discovered = await api.autoDiscover();
+    if (discovered) {
+      apiStatus.textContent = '✓ Auto-connected to live server: ' + discovered;
+      apiStatus.className = 'msg ok';
+      $('api_base').value = discovered;
+      return;
+    }
+
     if (isHttps && isInsecure) {
-      apiStatus.textContent = '✗ Mixed Content: GitHub Pages (HTTPS) cannot reach insecure HTTP (' + base + '). Use an HTTPS tunnel (?api=https://...) or open the server directly on your device.';
+      apiStatus.textContent = '✗ GitHub Pages (HTTPS) cannot reach insecure HTTP (' + base + '). Run `npm run server` with cloudflared or pass ?api=https://...';
     } else {
       apiStatus.textContent = '✗ Cannot reach ' + base + ' – is the server running?';
     }

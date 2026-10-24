@@ -9,7 +9,20 @@ let selected = null; // {slug, vp}
 
 const fmtDate = (s) => new Date(s).toLocaleString();
 const fail = (e) => {
-  app.innerHTML = `<h1>Results</h1><div class="card"><p class="msg bad">${esc(e.message)}</p><p class="muted">Check the API base URL on the <a href="./index.html">Submit</a> page.</p></div>`;
+  app.innerHTML = `<h1>Results</h1><div class="card"><p class="msg bad">${esc(e.message)}</p>
+    <p class="muted">Check the API base URL on the <a href="./index.html">Submit</a> page, or auto-detect below.</p>
+    <button class="btn sm" id="retry-discovery">Auto-Detect Server</button>
+  </div>`;
+  document.getElementById('retry-discovery')?.addEventListener('click', async () => {
+    app.innerHTML = `<h1>Results</h1><div class="card"><p class="msg">Auto-detecting live qaZAR server…</p></div>`;
+    const found = await api.autoDiscover();
+    if (found) {
+      if (id) startWatching();
+      else renderList();
+    } else {
+      fail(new Error('Could not auto-detect server. Is qaZAR running?'));
+    }
+  });
 };
 
 /* ---------- list view ---------- */

@@ -154,6 +154,12 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Automated Cloudflare HTTPS Quick Tunnel (`npm run server:tunnel`, `server/tunnel.js`) to provide secure public access outside the local network.
 - [x] Excluded GitHub Pages hostnames from port 8787 guessing and added mixed content error prevention in web client (`web/api.js`, `web/submit.js`).
 
+### 30. Zero-Config Mobile & Outside Network Auto-Discovery (Completed)
+- [x] Auto-publishing live tunnel and LAN discovery metadata to GitHub Gist on server launch (`server/tunnel.js`, `server/index.js`).
+- [x] Auto-detection and auto-retry on GitHub Pages (`autoDiscoverApi()` in `web/api.js`), allowing instant connectivity from mobile phones and outside networks without manual URL typing.
+- [x] In-app auto-detect retry action in results fail state and visual feedback in submission page (`web/submit.js`, `web/results.js`).
+- [x] Default tunnel activation on `npm run server` when `cloudflared` is detected (`server/config.js`).
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)

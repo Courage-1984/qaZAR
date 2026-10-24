@@ -6,7 +6,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const config = {
   host: process.env.HOST || '0.0.0.0',
   port: Number(process.env.PORT || 8787),
-  tunnel: process.argv.includes('--tunnel') || process.env.TUNNEL === '1',
+  tunnel: !process.argv.includes('--no-tunnel') && process.env.NO_TUNNEL !== '1',
   dataDir: process.env.DATA_DIR || path.join(root, 'data'),
   allowPrivate: process.env.ALLOW_PRIVATE === '1',
   pageConcurrency: Number(process.env.PAGE_CONCURRENCY || 2),
