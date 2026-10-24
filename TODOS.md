@@ -141,6 +141,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Captured robots.txt and sitemap discovery status in `crawlMeta` during crawl queue initialization (`crawl.js`).
 - [x] Surfaced search crawler compliance in executive reports and auto-triggered quick-win remediation steps (`scoreCalculator.js`, `reportGenerator.js`).
 
+### 27. Live Advisory Branding Toolbar & UI View Modularization (Completed)
+- [x] In-app persistent advisory branding input toolbar in UI results header for on-the-fly report whitelabeling (`web/results.js`).
+- [x] Modularized cell view and capture inspection logic into dedicated `web/cellView.js` to preserve strict file size caps (<250 lines).
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)
