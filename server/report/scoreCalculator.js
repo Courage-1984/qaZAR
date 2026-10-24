@@ -3,20 +3,74 @@
  * for client-facing audit reports and lead generation.
  */
 
+/**
+ * Clusters recurring violations across pages and viewports to eliminate
+ * reporting noise, false duplication, and inflated defect counts.
+ */
+export function clusterDefects(run) {
+  const map = new Map();
+  const totalPages = run.pages?.length || 1;
+
+  for (const page of run.pages || []) {
+    for (const [vp, rec] of Object.entries(page.viewports || {})) {
+      for (const v of rec.violations || []) {
+        const key = `${v.rule}::${v.selector || v.detail || 'unknown'}`;
+        let item = map.get(key);
+        if (!item) {
+          item = {
+            rule: v.rule,
+            severity: v.severity,
+            selector: v.selector || null,
+            detail: v.detail,
+            pages: new Set(),
+            viewports: new Set(),
+            count: 0,
+          };
+          map.set(key, item);
+        }
+        item.pages.add(page.url);
+        item.viewports.add(vp);
+        item.count++;
+      }
+    }
+  }
+
+  const clusters = [...map.values()].map((c) => ({
+    rule: c.rule,
+    severity: c.severity,
+    selector: c.selector,
+    detail: c.detail,
+    pagesCount: c.pages.size,
+    viewports: [...c.viewports],
+    totalOccurrences: c.count,
+    isGlobal: c.pages.size >= Math.min(2, totalPages) && totalPages > 1,
+  }));
+
+  clusters.sort((a, b) => {
+    if (a.severity === 'error' && b.severity !== 'error') return -1;
+    if (a.severity !== 'error' && b.severity === 'error') return 1;
+    return b.totalOccurrences - a.totalOccurrences;
+  });
+
+  return clusters;
+}
+
 export function calculateHealthScore(run) {
-  const s = run.summary || { violations: { error: 0, warn: 0 }, changed: 0 };
+  const clusters = clusterDefects(run);
+  const errorClusters = clusters.filter((c) => c.severity === 'error');
+  const warnClusters = clusters.filter((c) => c.severity === 'warn');
+
   let score = 100;
+  // Deduct for distinct defect clusters with capped duplicate drag
+  score -= errorClusters.length * 6;
+  score -= warnClusters.length * 2.5;
 
-  // Deduct for violations
-  const errorCount = s.violations.error || 0;
-  const warnCount = s.violations.warn || 0;
-  const visualChanges = s.changed || 0;
+  const totalRawErrors = clusters.reduce((acc, c) => c.severity === 'error' ? acc + c.totalOccurrences : acc, 0);
+  const totalRawWarns = clusters.reduce((acc, c) => c.severity === 'warn' ? acc + c.totalOccurrences : acc, 0);
+  score -= Math.min(10, Math.max(0, totalRawErrors - errorClusters.length) * 0.5);
+  score -= Math.min(5, Math.max(0, totalRawWarns - warnClusters.length) * 0.2);
+  score -= (run.summary?.changed || 0) * 2;
 
-  score -= errorCount * 4;
-  score -= warnCount * 1.5;
-  score -= visualChanges * 2;
-
-  // Clamp between 15 and 100
   const finalScore = Math.max(15, Math.min(100, Math.round(score)));
 
   let grade = 'F';
@@ -41,7 +95,6 @@ export function calculateHealthScore(run) {
     recommendation = 'Major Responsive Refactor & Architecture Overhaul';
   }
 
-  // Calculate category risks
   const categories = {
     mobileTouch: 0,
     overflowBreakage: 0,
@@ -50,16 +103,12 @@ export function calculateHealthScore(run) {
     collisions: 0,
   };
 
-  for (const page of run.pages || []) {
-    for (const rec of Object.values(page.viewports || {})) {
-      for (const v of rec.violations || []) {
-        if (v.rule.includes('touch')) categories.mobileTouch++;
-        else if (v.rule.includes('overflow')) categories.overflowBreakage++;
-        else if (v.rule.includes('contrast')) categories.wcagContrast++;
-        else if (v.rule.includes('heading') || v.rule.includes('font')) categories.typography++;
-        else if (v.rule.includes('collision')) categories.collisions++;
-      }
-    }
+  for (const c of clusters) {
+    if (c.rule.includes('touch')) categories.mobileTouch += c.totalOccurrences;
+    else if (c.rule.includes('overflow')) categories.overflowBreakage += c.totalOccurrences;
+    else if (c.rule.includes('contrast')) categories.wcagContrast += c.totalOccurrences;
+    else if (c.rule.includes('heading') || c.rule.includes('font')) categories.typography += c.totalOccurrences;
+    else if (c.rule.includes('collision')) categories.collisions += c.totalOccurrences;
   }
 
   return {
@@ -70,10 +119,13 @@ export function calculateHealthScore(run) {
     metrics: {
       totalPages: run.pages?.length || 0,
       totalCaptures: (run.pages?.length || 0) * 7,
-      errors: errorCount,
-      warnings: warnCount,
-      visualChanges,
+      distinctErrors: errorClusters.length,
+      distinctWarnings: warnClusters.length,
+      globalDefects: clusters.filter((c) => c.isGlobal).length,
+      rawErrors: totalRawErrors,
+      rawWarnings: totalRawWarns,
       categories,
     },
+    clusters,
   };
 }

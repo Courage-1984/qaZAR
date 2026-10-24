@@ -16,7 +16,7 @@ function esc(s) {
  * designed to capture qualified inbound leads for site redesigns/rebuilds.
  */
 export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev') {
-  const { score, grade, status, recommendation, metrics } = calculateHealthScore(run);
+  const { score, grade, status, recommendation, metrics, clusters } = calculateHealthScore(run);
   const domain = run.input?.domain || 'Unknown Domain';
   const dateStr = new Date(run.createdAt || Date.now()).toLocaleDateString('en-US', {
     month: 'short',
@@ -24,22 +24,7 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
     year: 'numeric',
   });
 
-  // Extract top sample violations for executive briefing (curated teaser evidence)
-  const sampleIssues = [];
-  for (const page of run.pages || []) {
-    for (const [vp, rec] of Object.entries(page.viewports || {})) {
-      for (const v of rec.violations || []) {
-        if (v.severity === 'error' && sampleIssues.length < 8) {
-          sampleIssues.push({
-            page: page.url,
-            viewport: vp,
-            rule: v.rule,
-            detail: v.detail,
-          });
-        }
-      }
-    }
-  }
+  const topClusters = (clusters || []).slice(0, 8);
 
   const gradeColor =
     score >= 85 ? '#10b981' : score >= 70 ? '#f59e0b' : '#ef4444';
@@ -113,12 +98,12 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
 
     <div class="grid">
       <div class="card">
-        <h3>Critical UX Flaws</h3>
-        <div class="val" style="color: #ef4444;">${metrics.errors}</div>
+        <h3>Critical Defect Patterns</h3>
+        <div class="val" style="color: #ef4444;">${metrics.distinctErrors} <small style="font-size:0.85rem;color:var(--muted);font-weight:400;">(${metrics.rawErrors} raw)</small></div>
       </div>
       <div class="card">
-        <h3>Friction Points</h3>
-        <div class="val" style="color: #f59e0b;">${metrics.warnings}</div>
+        <h3>Systemic Global Issues</h3>
+        <div class="val" style="color: #f59e0b;">${metrics.globalDefects} <small style="font-size:0.85rem;color:var(--muted);font-weight:400;">site-wide</small></div>
       </div>
       <div class="card">
         <h3>Mobile Risk Score</h3>
@@ -169,13 +154,18 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
       </div>
     </section>` : ''}
 
-    ${sampleIssues.length ? `
+    ${topClusters.length ? `
     <section class="impact-section">
-      <h2>Sample Defect Evidence (Executive Sampling)</h2>
-      <div style="font-size: 0.85rem; color: var(--muted); margin-bottom: 0.75rem;">Full root-cause CSS tree and baseline diffs withheld in executive summary.</div>
-      ${sampleIssues.map((issue) => `
+      <h2>Consolidated Defect Evidence (${metrics.distinctErrors} Distinct Issues Across ${metrics.totalPages} Pages)</h2>
+      <div style="font-size: 0.85rem; color: var(--muted); margin-bottom: 0.75rem;">Repetitive cross-device duplicates clustered to highlight systemic layout bugs without noise.</div>
+      ${topClusters.map((c) => `
         <div style="background: var(--card); border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 0.5rem; font-size: 0.85rem;">
-          <b style="color: var(--accent);">${esc(issue.viewport.toUpperCase())}</b>: ${esc(issue.detail)}
+          <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
+            <b style="color: ${c.severity === 'error' ? '#ef4444' : '#f59e0b'};">${c.isGlobal ? '🌐 SITE-WIDE' : '📄 PAGE'}: ${esc(c.rule)}</b>
+            <span style="color:var(--muted); font-size:0.75rem;">${c.totalOccurrences}&times; in ${c.viewports.length} viewports (${esc(c.viewports.join(', '))})</span>
+          </div>
+          <div style="color: var(--text);">${esc(c.detail)}</div>
+          ${c.selector ? `<div style="color:var(--muted); font-family:monospace; font-size:0.75rem; margin-top:0.25rem;">${esc(c.selector)}</div>` : ''}
         </div>
       `).join('')}
     </section>` : ''}

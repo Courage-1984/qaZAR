@@ -81,23 +81,37 @@ Sitemap: https://example.com/sitemap.xml
   assert.equal(isUrlAllowed('https://example.com/admin/settings', parsed.disallows), false);
 });
 
-test('calculateHealthScore calculates grade and risk categories', async () => {
-  const { calculateHealthScore } = await import('../report/scoreCalculator.js');
+test('calculateHealthScore and clusterDefects eliminate noise and group patterns', async () => {
+  const { calculateHealthScore, clusterDefects } = await import('../report/scoreCalculator.js');
   const mockRun = {
     summary: { violations: { error: 2, warn: 4 }, changed: 1 },
     pages: [
       {
         url: 'https://example.com/',
         viewports: {
-          mobile: { violations: [{ rule: 'touch-target-size', severity: 'error' }] },
+          mobile: { violations: [{ rule: 'touch-target-size', severity: 'error', selector: 'nav > a', detail: 'Touch target 24px' }] },
+          tablet: { violations: [{ rule: 'touch-target-size', severity: 'error', selector: 'nav > a', detail: 'Touch target 24px' }] },
+        },
+      },
+      {
+        url: 'https://example.com/pricing',
+        viewports: {
+          mobile: { violations: [{ rule: 'touch-target-size', severity: 'error', selector: 'nav > a', detail: 'Touch target 24px' }] },
         },
       },
     ],
   };
+  const clusters = clusterDefects(mockRun);
+  assert.equal(clusters.length, 1);
+  assert.equal(clusters[0].totalOccurrences, 3);
+  assert.equal(clusters[0].isGlobal, true);
+
   const result = calculateHealthScore(mockRun);
   assert.ok(result.score > 0 && result.score <= 100);
   assert.ok(['A', 'B', 'C', 'D', 'F'].includes(result.grade));
-  assert.equal(result.metrics.categories.mobileTouch, 1);
+  assert.equal(result.metrics.distinctErrors, 1);
+  assert.equal(result.metrics.globalDefects, 1);
+  assert.equal(result.metrics.rawErrors, 3);
 });
 
 test('generateExecutiveReport produces standalone HTML with lead generation CTA', async () => {
