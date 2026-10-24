@@ -133,6 +133,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Configurable agency brand name and advisory styling (`?agency=`) across executive audit header, footer, and lead CTA (`reportGenerator.js`, `routes/runs.js`).
 - [x] Updated client web API helper to support structured report query parameters (`web/api.js`).
 
+### 25. Bounding Box Violation Inspection & Report URL Query Fix (Completed)
+- [x] Inlined element bounding box coordinates (`w×h @ (x,y)`) into detail violation rows for rapid layout debug (`web/results.js`).
+- [x] Fixed structured query parameter formatting for JSON executive report exports (`web/results.js`).
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)
