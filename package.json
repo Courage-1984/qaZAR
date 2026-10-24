@@ -1,0 +1,29 @@
+{
+  "name": "qazar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Viewport UI/UX QA & visual regression testing suite",
+  "scripts": {
+    "server": "node server/index.js",
+    "dev:web": "vite web",
+    "build:web": "vite build web",
+    "preview:web": "vite preview web",
+    "test": "node --test server/test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "fast-xml-parser": "^5.11.2",
+    "pixelmatch": "^8.0.0",
+    "playwright": "^1.64.1",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.5"
+  }
+}
+

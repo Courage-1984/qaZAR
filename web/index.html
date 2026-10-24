@@ -1,9 +1,55 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>qaZAR – Viewport QA Submission</title><meta name="description" content="Submit a site for viewport UI/UX QA and visual regression testing."><link rel="stylesheet" href="style.css"></head>
-<body><nav><a href="./">Submit</a><a href="results.html">Results</a></nav>
-<main><h1>qaZAR</h1><p>Viewport UI/UX QA &amp; visual regression.</p>
-<form id="f"><label for="domain">Domain</label><input id="domain" type="url" required placeholder="https://example.com">
-<label for="sitemap_url">Sitemap URL</label><input id="sitemap_url" type="url" placeholder="https://example.com/sitemap.xml">
-<label for="max_pages">Max pages</label><input id="max_pages" type="number" min="1" value="10">
-<button id="submit" type="submit">Run QA</button></form><p id="msg"></p></main>
-<script>document.getElementById('f').addEventListener('submit',e=>{e.preventDefault();document.getElementById('msg').textContent='Backend not connected yet – coming soon.'})</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>qaZAR – Viewport QA Submission</title>
+  <meta name="description" content="Submit a site for viewport UI/UX QA and visual regression testing across 7 viewports.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="bg-glow" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="brand" href="./index.html"><span class="logo">qa</span>ZAR</a>
+    <nav aria-label="Primary">
+      <a class="active" href="./index.html" id="nav-submit">Submit</a>
+      <a href="./results.html" id="nav-results">Results</a>
+    </nav>
+  </header>
+  <main class="container">
+    <section class="hero">
+      <h1>Viewport QA, <span class="grad">pixel-perfect.</span></h1>
+      <p class="lead">Crawl a site across 7 viewports, catch UX/UI violations and visual regressions.</p>
+    </section>
+
+    <section class="card" aria-labelledby="form-title">
+      <h2 id="form-title">New run</h2>
+      <form id="run-form" novalidate>
+        <label for="domain">Domain</label>
+        <input id="domain" name="domain" type="url" required placeholder="https://example.com" autocomplete="url">
+        <label for="sitemap_url">Sitemap URL <span class="muted">(optional)</span></label>
+        <input id="sitemap_url" name="sitemap_url" type="url" placeholder="https://example.com/sitemap.xml">
+        <label for="max_pages">Max pages</label>
+        <input id="max_pages" name="max_pages" type="number" min="1" max="200" value="10">
+        <button id="submit" class="btn primary" type="submit">Run QA</button>
+        <p id="msg" class="msg" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="api-title">
+      <h2 id="api-title">Backend</h2>
+      <p class="muted">The UI talks to a qaZAR API server (Playwright can't run on GitHub Pages). Run <code>npm run server</code> locally.</p>
+      <label for="api_base">API base URL</label>
+      <div class="row">
+        <input id="api_base" type="url" placeholder="http://localhost:8787">
+        <button id="api-save" class="btn" type="button">Save &amp; test</button>
+      </div>
+      <p id="api-status" class="msg" role="status"></p>
+    </section>
+  </main>
+  <script type="module" src="./submit.js"></script>
+</body>
+</html>
