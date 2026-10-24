@@ -149,6 +149,8 @@ export function generateActionRoadmap(run, categories = {}, clusters = []) {
   if (p.socialSharing && !p.socialSharing.hasOpenGraph) quickWins.push('Add OpenGraph metadata (og:title, og:image) to prevent unbranded links on LinkedIn and Slack.');
   if (p.codeHygiene?.missingAltImagesTotal > 0) quickWins.push(`Add alt text to ${p.codeHygiene.missingAltImagesTotal} image(s) for WCAG accessibility compliance.`);
   if (p.codeHygiene && !p.codeHygiene.hasFavicon) quickWins.push('Add high-resolution favicon and Apple touch icon for branded browser tabs.');
+  if (p.crawlMeta && !p.crawlMeta.hasRobotsTxt) quickWins.push('Add standard robots.txt to guide search crawlers and protect server bandwidth.');
+  if (p.crawlMeta && !p.crawlMeta.hasSitemap) quickWins.push('Generate and submit XML sitemap (sitemap.xml) for search engine indexing.');
 
   if (categories.mobileTouch > 0) coreUx.push(`Enlarge ${categories.mobileTouch} touch target(s) to meet the 48x48px accessibility minimum.`);
   if (categories.overflowBreakage > 0) coreUx.push(`Constrain ${categories.overflowBreakage} layout element(s) causing horizontal viewport overflow.`);

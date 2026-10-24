@@ -82,12 +82,14 @@ export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs
   const origin = new URL(start).origin;
 
   let disallows = [];
+  let hasRobotsTxt = false;
   try {
     const robotsRes = await fetch(`${origin}/robots.txt`, {
       headers: { 'user-agent': 'qaZAR/0.1' },
       signal: AbortSignal.timeout(5000),
     });
     if (robotsRes.ok) {
+      hasRobotsTxt = true;
       const robotsTxt = await robotsRes.text();
       disallows = parseRobotsTxt(robotsTxt).disallows || [];
     }
@@ -127,10 +129,13 @@ export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs
     } catch {
       /* skip */
     }
-    return { urls: prioritized, source: 'sitemap', siteProfile: aggregateSiteProfile(pageSignals) };
+    const siteProfile = aggregateSiteProfile(pageSignals);
+    siteProfile.crawlMeta = { hasRobotsTxt, hasSitemap: true };
+    return { urls: prioritized, source: 'sitemap', siteProfile };
   }
 
   onProgress?.('crawling:bfs', `Starting BFS discovery crawl on ${start}...`);
   const { urls, siteProfile } = await bfs(start, max_pages, { renderJs, onProgress, disallows });
+  siteProfile.crawlMeta = { hasRobotsTxt, hasSitemap: false };
   return { urls: urls.length ? urls : [start], source: 'crawl', siteProfile };
 }

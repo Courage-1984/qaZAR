@@ -137,6 +137,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Inlined element bounding box coordinates (`w×h @ (x,y)`) into detail violation rows for rapid layout debug (`web/results.js`).
 - [x] Fixed structured query parameter formatting for JSON executive report exports (`web/results.js`).
 
+### 26. Crawl Metadata & Search Engine Compliance Profiling (Completed)
+- [x] Captured robots.txt and sitemap discovery status in `crawlMeta` during crawl queue initialization (`crawl.js`).
+- [x] Surfaced search crawler compliance in executive reports and auto-triggered quick-win remediation steps (`scoreCalculator.js`, `reportGenerator.js`).
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)
