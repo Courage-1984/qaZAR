@@ -59,7 +59,8 @@ export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, hea
   signals.hasViewportMeta = /<meta\s[^>]*name\s*=\s*["']viewport["']/i.test(html);
   signals.hasTitle = /<title[^>]*>[\s\S]+?<\/title>/i.test(html);
   signals.hasDescription = /<meta\s[^>]*name\s*=\s*["']description["']/i.test(html);
-  signals.hasOpenGraph = /<meta\s[^>]*property\s*=\s*["']og:/i.test(html);
+  signals.hasOpenGraph = /<meta\s[^>]*property\s*=\s*["']og:image["']/i.test(html) && /<meta\s[^>]*property\s*=\s*["']og:title["']/i.test(html);
+  signals.hasCanonical = /<link\s[^>]*rel\s*=\s*["']canonical["']/i.test(html);
 
   // 2. Tech stack fingerprinting (cheap regex on scripts, meta generators, classes)
   const tech = new Set();
@@ -143,6 +144,7 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
     seoScore: 100,
     security: { isHttps: true, hasHsts: true, hasCsp: true, score: 100, flags: [] },
     assetHygiene: { uncompressedCount: 0, unlazyImagesTotal: 0, blockingScriptsTotal: 0, webFontsTotal: 0 },
+    socialSharing: { hasOpenGraph: true, hasCanonical: true },
     funnel: {
       hasPricing: false,
       hasCheckout: false,
@@ -167,7 +169,8 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
 
     if (!s.hasTitle) profile.seoScore -= 10;
     if (!s.hasDescription) profile.seoScore -= 5;
-    if (!s.hasOpenGraph) profile.seoScore -= 5;
+    if (!s.hasOpenGraph) { profile.seoScore -= 5; profile.socialSharing.hasOpenGraph = false; }
+    if (!s.hasCanonical) profile.socialSharing.hasCanonical = false;
 
     if (s.security) {
       if (!s.security.isHttps) profile.security.isHttps = false;
@@ -219,6 +222,7 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
       flags: profile.security.flags,
     },
     assetHygiene: profile.assetHygiene,
+    socialSharing: profile.socialSharing,
     funnel: profile.funnel,
   };
 }

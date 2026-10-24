@@ -101,6 +101,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Multi-state matrix filtering chips (`ALL`, `ERROR`, `WARN`, `CHANGED`) and live URL search input (`web/results.js`).
 - [x] Client-side row filtering with real-time match counters.
 
+### 17. Social OpenGraph & Canonical Link Previews (Completed)
+- [x] Verified OpenGraph image/title and canonical URL presence (`siteProfiler.js`).
+- [x] Social preview readiness card in executive report and actionable roadmap quick-win triggers.
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)

@@ -186,6 +186,8 @@ test('extractCrawlSignals detects tech stack, viewport meta, and lead contacts',
   assert.equal(profile.funnel.hasContact, true);
   assert.equal(profile.funnel.brokenLinks.length, 1);
   assert.equal(profile.funnel.brokenLinks[0].status, 404);
+  assert.equal(profile.socialSharing.hasOpenGraph, false);
+  assert.equal(profile.socialSharing.hasCanonical, false);
   assert.ok(profile.techStack.includes('Shopify'));
   assert.ok(profile.leadContacts.emails.includes('founder@shop.com'));
 });

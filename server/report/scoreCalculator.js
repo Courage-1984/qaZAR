@@ -146,6 +146,7 @@ export function generateActionRoadmap(run, categories = {}, clusters = []) {
   if (p.assetHygiene?.blockingScriptsTotal > 0) quickWins.push(`Add async/defer to ${p.assetHygiene.blockingScriptsTotal} render-blocking head script(s).`);
   if (p.assetHygiene?.unlazyImagesTotal > 3) quickWins.push(`Add loading="lazy" across ${p.assetHygiene.unlazyImagesTotal} off-screen image(s).`);
   if (p.hasMissingViewportMeta) quickWins.push('Add standard mobile viewport meta tag for responsive scaling.');
+  if (p.socialSharing && !p.socialSharing.hasOpenGraph) quickWins.push('Add OpenGraph metadata (og:title, og:image) to prevent unbranded links on LinkedIn and Slack.');
 
   if (categories.mobileTouch > 0) coreUx.push(`Enlarge ${categories.mobileTouch} touch target(s) to meet the 48x48px accessibility minimum.`);
   if (categories.overflowBreakage > 0) coreUx.push(`Constrain ${categories.overflowBreakage} layout element(s) causing horizontal viewport overflow.`);
