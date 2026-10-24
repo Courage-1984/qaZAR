@@ -79,6 +79,11 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Zero-cost broken link detection during BFS and sitemap discovery.
 - [x] Print & PDF export engine in `reportGenerator.js` with page-break protection and one-click print button.
 
+### 12. Anti-Inflation Calibration & Authentic Reporting (Completed)
+- [x] Selector normalization in `clusterDefects`: collapses sibling elements (e.g. repeated navigation/footer items) into a single component finding to prevent artificial defect multiplication.
+- [x] Scope-calibrated dev effort estimator: realistically scales hours based on actual site page count and clean architecture (e.g. 1-page sites with minor issues receive 1-2h polish, not 8h-15h inflation).
+- [x] Suppressed 0-count risk items in executive reports: non-existent liabilities are replaced with positive structural health confirmations.
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)

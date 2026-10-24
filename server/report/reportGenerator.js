@@ -121,18 +121,26 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
 
     <section class="impact-section">
       <h2>Business &amp; Conversion Impact</h2>
+      ${metrics.categories.mobileTouch > 0 ? `
       <div class="risk-item">
         <div class="risk-title">📱 Mobile Conversion Friction (${metrics.categories.mobileTouch} issues detected)</div>
         <div class="risk-desc">Buttons or interactive tap targets smaller than 48px create tap errors and drop mobile checkout conversion rates by up to 28%.</div>
-      </div>
+      </div>` : ''}
+      ${metrics.categories.overflowBreakage > 0 ? `
       <div class="risk-item">
         <div class="risk-title">📐 Layout &amp; Horizontal Breakage (${metrics.categories.overflowBreakage} issues detected)</div>
         <div class="risk-desc">Elements exceeding viewport boundaries force awkward horizontal scrolling on smartphones, signaling unoptimized front-end engineering.</div>
-      </div>
+      </div>` : ''}
+      ${metrics.categories.wcagContrast > 0 ? `
       <div class="risk-item">
         <div class="risk-title">⚖️ Accessibility &amp; Contrast Compliance (${metrics.categories.wcagContrast} issues detected)</div>
         <div class="risk-desc">Text elements failing WCAG AA contrast ratios (4.5:1) expose digital properties to European and US accessibility liability (ADA/EAA).</div>
-      </div>
+      </div>` : ''}
+      ${(metrics.categories.mobileTouch === 0 && metrics.categories.overflowBreakage === 0 && metrics.categories.wcagContrast === 0) ? `
+      <div style="background: var(--card); border: 1px solid var(--border); border-left: 4px solid #10b981; padding: 1rem; border-radius: 0 8px 8px 0;">
+        <div style="font-weight: 600; color: #10b981;">✓ High Structural &amp; Layout Health</div>
+        <div style="font-size: 0.85rem; color: var(--muted); margin-top: 2px;">Zero critical layout collisions, horizontal overflows, or accessibility contrast violations detected.</div>
+      </div>` : ''}
     </section>
 
     ${run.siteProfile ? `

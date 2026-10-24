@@ -14,13 +14,17 @@ export function clusterDefects(run) {
   for (const page of run.pages || []) {
     for (const [vp, rec] of Object.entries(page.viewports || {})) {
       for (const v of rec.violations || []) {
-        const key = `${v.rule}::${v.selector || v.detail || 'unknown'}`;
+        const normalizedSel = (v.selector || '')
+          .replace(/:nth-of-type\(\d+\)/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+        const key = `${v.rule}::${normalizedSel || v.detail || 'unknown'}`;
         let item = map.get(key);
         if (!item) {
           item = {
             rule: v.rule,
             severity: v.severity,
-            selector: v.selector || null,
+            selector: normalizedSel || v.selector || null,
             detail: v.detail,
             pages: new Set(),
             viewports: new Set(),
@@ -132,23 +136,40 @@ export function calculateHealthScore(run) {
 }
 
 export function estimateRemediationRoi(run, score, distinctErrors, distinctWarnings, globalDefects) {
+  const totalPages = run.pages?.length || 1;
   const techStack = run.siteProfile?.techStack || [];
   const hasLegacyDebt = techStack.some((t) => t.includes('Legacy') || t.includes('WordPress'));
-  const multiplier = hasLegacyDebt ? 1.3 : 1.0;
+  const multiplier = hasLegacyDebt ? 1.25 : 1.0;
 
-  const baseHours = 4;
-  const errorHours = distinctErrors * 2.5;
-  const warnHours = distinctWarnings * 1.0;
-  const estimatedHours = Math.round((baseHours + errorHours + warnHours) * multiplier);
+  let estimatedHours = 0;
+  if (distinctErrors === 0 && distinctWarnings === 0) {
+    estimatedHours = 0;
+  } else if (score >= 90) {
+    estimatedHours = Math.max(1, Math.round(distinctErrors * 1 + distinctWarnings * 0.5));
+  } else {
+    const baseHours = totalPages === 1 ? 1 : Math.min(3, Math.round(totalPages * 0.4));
+    const errorHours = distinctErrors * 1.5;
+    const warnHours = distinctWarnings * 0.5;
+    estimatedHours = Math.max(1, Math.round((baseHours + errorHours + warnHours) * multiplier));
+  }
 
   let recommendationType = 'patch';
-  let recommendationTitle = 'Targeted Responsive Remediation';
-  let recommendationReason = 'Defects are localized; patching CSS layout and accessibility targets is cost-effective.';
+  let recommendationTitle = 'Targeted Responsive Polish';
+  let recommendationReason = 'Defects are minor and localized; updating CSS component styles is cost-effective.';
 
-  if (score < 70 || globalDefects >= 2 || (hasLegacyDebt && score < 80)) {
+  if (score >= 90 && distinctErrors <= 1) {
+    recommendationType = 'polish';
+    recommendationTitle = 'Minor Cosmetic Polish';
+    recommendationReason = 'Site architecture and responsive layout are in excellent shape. Only minor CSS tweaks needed.';
+  } else if (score < 65 || globalDefects >= 3 || (hasLegacyDebt && score < 75)) {
     recommendationType = 'rebuild';
     recommendationTitle = 'Full Modern Rebuild Recommended';
     recommendationReason = 'Defects span global templates and legacy frameworks. A clean responsive rebuild yields higher long-term ROI than recurring CSS patches.';
+    estimatedHours = Math.max(25, totalPages * 10);
+  } else if (score < 80) {
+    recommendationType = 'remediation';
+    recommendationTitle = 'Component-Level UX Remediation';
+    recommendationReason = 'Moderate responsive and accessibility friction across key templates. Refactoring shared layout components will restore compliance.';
   }
 
   return {
