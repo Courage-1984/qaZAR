@@ -117,6 +117,18 @@ function evaluateCrossViewport(page) {
       });
     }
   }
+
+  const deskH2 = deskRec.metrics.headings?.h2;
+  const mobH2 = mobRec.metrics.headings?.h2;
+  if (deskH2 && mobH2 && deskH2 > 24 && mobH2 >= deskH2) {
+    mobRec.violations.push({
+      rule: 'heading-scale-static',
+      severity: 'warn',
+      selector: 'h2',
+      rect: null,
+      detail: `H2 size (${mobH2}px) does not scale down on mobile (390px) from desktop (${deskH2}px)`,
+    });
+  }
 }
 
 export async function processRun(runId) {

@@ -236,7 +236,10 @@ export function evaluate({ touch, viewportWidth }) {
     if (!fg || fg.a < 0.1) continue;
 
     const { color: bg, hasBgImage } = getEffectiveBg(el);
-    if (hasBgImage) continue; // indeterminate due to background-image/gradient
+    if (hasBgImage) {
+      add('wcag-contrast-indeterminate', 'info', el, 'Text rests over background-image or gradient; manual review suggested');
+      continue;
+    }
 
     const lFg = relLuminance(fg);
     const lBg = relLuminance(bg);
@@ -287,7 +290,7 @@ export function evaluate({ touch, viewportWidth }) {
     return r.width > 20 && r.height > 15;
   });
 
-  const sampleLimit = Math.min(layoutElements.length, 35);
+  const sampleLimit = Math.min(layoutElements.length, 60);
   for (let i = 0; i < sampleLimit; i++) {
     const elA = layoutElements[i];
     const rA = elA.getBoundingClientRect();
@@ -335,6 +338,8 @@ export function evaluate({ touch, viewportWidth }) {
     const navs = document.querySelectorAll('nav, [role=navigation], header nav');
     for (const nav of navs) {
       if (!visible(nav)) continue;
+      const navCs = getComputedStyle(nav);
+      if (navCs.overflowX === 'auto' || navCs.overflowX === 'scroll') continue;
       const links = [...nav.querySelectorAll('a[href]')].filter(visible);
       const navRect = nav.getBoundingClientRect();
 
@@ -346,7 +351,7 @@ export function evaluate({ touch, viewportWidth }) {
 
         // Check if there is an off-canvas / hamburger menu toggle button present
         const hasToggle = !!document.querySelector(
-          'button[aria-expanded], button[aria-controls], button[aria-label*="menu" i], .hamburger, [data-toggle="collapse"], .nav-toggle, #menu-toggle'
+          'button[aria-expanded], button[aria-controls], button[aria-label*="menu" i], button[aria-label*="nav" i], .hamburger, [data-toggle="collapse"], .nav-toggle, #menu-toggle, .navbar-toggler'
         );
 
         if (isHorizontal && (last.right > viewportWidth || navRect.width > viewportWidth * 0.9) && !hasToggle) {

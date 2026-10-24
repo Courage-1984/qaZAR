@@ -66,3 +66,19 @@ test('roiScorer prioritizes high-impact pages over paginated links', async () =>
   assert.ok(top.includes('https://example.com/login'));
 });
 
+test('robots.txt parser extracts disallows and sitemaps correctly', async () => {
+  const { parseRobotsTxt, isUrlAllowed } = await import('../crawler/robots.js');
+  const sample = `
+User-agent: *
+Disallow: /admin/
+Disallow: /private/
+Sitemap: https://example.com/sitemap.xml
+`;
+  const parsed = parseRobotsTxt(sample);
+  assert.deepEqual(parsed.disallows, ['/admin/', '/private/']);
+  assert.deepEqual(parsed.sitemaps, ['https://example.com/sitemap.xml']);
+  assert.equal(isUrlAllowed('https://example.com/pricing', parsed.disallows), true);
+  assert.equal(isUrlAllowed('https://example.com/admin/settings', parsed.disallows), false);
+});
+
+
