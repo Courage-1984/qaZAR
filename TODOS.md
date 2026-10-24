@@ -93,6 +93,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Prioritized implementation roadmap generator (`scoreCalculator.js`): Tier 1 Quick Wins (<1h), Tier 2 UX & Accessibility, Tier 3 Strategic Architecture.
 - [x] Native visual rendering in executive audit reports and print/PDF views (`reportGenerator.js`).
 
+### 15. Cross-Viewport Breakpoint Inversion & Tablet Comparison (Completed)
+- [x] Multi-viewport breakpoint inversion detection (`heading-scale-inverted`) across desktop, tablet, and mobile (`jobQueue.js`).
+- [x] Unit test suite for cross-viewport scaling and style inversion in `server/test/unit.test.js`.
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)

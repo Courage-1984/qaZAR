@@ -49,10 +49,10 @@ Viewport UI/UX QA + visual regression suite. Node/Express API + Playwright worke
   - Paywall & payment processing.
 
 ## Known weak spots
-- Contrast skips elements over background images/gradients (approximation, not flagged as indeterminate yet).
-- Collision check samples only ~35 elements; nav-collapse is selector-heuristic based.
-- Run state is in-memory + JSON files; one run at a time; restart marks in-flight runs `failed`.
-- `evaluateCrossViewport` compares `desktop` vs `mobile` H1 only.
+- Complex CSS pseudo-elements (::before/::after) background compositing can require indeterminate contrast flagging.
+- Collision check samples top 60 elements with viewport-intersection filtering.
+- Run state is in-memory + JSON files; restart marks in-flight runs `failed`.
+- `evaluateCrossViewport` compares `desktop` vs `tablet` and `mobile` across H1/H2 and detects breakpoint style inversions.
 
 ## Agent tooling map
 Rules: `.agents/rules/` · Skills: `.agents/skills/` (mirrored in `.claude/skills/`) · Workflows: `.agents/workflows/` (`/verify`, `/ship`, `/test-heuristics`, `/audit-security`, `/docker-test`) · Hooks: `hooks.json` → `guard.mjs` (PreToolUse) + `post-tool.mjs` (PostToolUse) · MCP: `mcp_config.json` / `.mcp.json` · Subagents: `.claude/agents/`.

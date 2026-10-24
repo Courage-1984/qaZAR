@@ -198,5 +198,19 @@ test('ensurePortFree runs without unhandled errors on any port', async () => {
   });
 });
 
+test('evaluateCrossViewport detects breakpoint inversions and static scaling', async () => {
+  const { evaluateCrossViewport } = await import('../queue/jobQueue.js');
+  const mockPage = {
+    viewports: {
+      desktop: { metrics: { headings: { h1: 32, h2: 26 }, bodyFont: 16 }, violations: [] },
+      tablet: { metrics: { headings: { h1: 38 } }, violations: [] },
+      mobile: { metrics: { headings: { h1: 40, h2: 26 }, bodyFont: 16 }, violations: [] },
+    },
+  };
+  evaluateCrossViewport(mockPage);
+  assert.ok(mockPage.viewports.tablet.violations.some((v) => v.rule === 'heading-scale-inverted'));
+  assert.ok(mockPage.viewports.mobile.violations.some((v) => v.rule === 'heading-scale-inverted'));
+});
+
 
 

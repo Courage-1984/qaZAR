@@ -90,46 +90,72 @@ function summarize(run) {
   return s;
 }
 
-function evaluateCrossViewport(page) {
+export function evaluateCrossViewport(page) {
   const deskRec = page.viewports['desktop'] || page.viewports['fhd'] || page.viewports['ultrawide'];
   const mobRec = page.viewports['mobile'];
-  if (!deskRec?.metrics || !mobRec?.metrics) return;
+  const tabRec = page.viewports['tablet'];
+  if (!deskRec?.metrics) return;
 
   const deskH1 = deskRec.metrics.headings?.h1;
-  const mobH1 = mobRec.metrics.headings?.h1;
-  const mobBody = mobRec.metrics.bodyFont || 16;
+  const deskH2 = deskRec.metrics.headings?.h2;
 
-  if (deskH1 && mobH1) {
-    if (deskH1 > 28 && mobH1 >= deskH1) {
-      mobRec.violations.push({
-        rule: 'heading-scale-static',
+  if (tabRec?.metrics && deskH1) {
+    const tabH1 = tabRec.metrics.headings?.h1;
+    if (tabH1 && tabH1 > deskH1 + 4) {
+      tabRec.violations = tabRec.violations || [];
+      tabRec.violations.push({
+        rule: 'heading-scale-inverted',
         severity: 'warn',
         selector: 'h1',
         rect: null,
-        detail: `H1 size (${mobH1}px) does not scale down on mobile (390px) from desktop (${deskH1}px)`,
-      });
-    }
-    if (mobH1 <= mobBody) {
-      mobRec.violations.push({
-        rule: 'heading-scale-undersized',
-        severity: 'error',
-        selector: 'h1',
-        rect: null,
-        detail: `H1 size (${mobH1}px) is less than or equal to base body font (${mobBody}px) on mobile`,
+        detail: `Tablet H1 (${tabH1}px) exceeds desktop H1 (${deskH1}px) indicating breakpoint style inversion`,
       });
     }
   }
 
-  const deskH2 = deskRec.metrics.headings?.h2;
-  const mobH2 = mobRec.metrics.headings?.h2;
-  if (deskH2 && mobH2 && deskH2 > 24 && mobH2 >= deskH2) {
-    mobRec.violations.push({
-      rule: 'heading-scale-static',
-      severity: 'warn',
-      selector: 'h2',
-      rect: null,
-      detail: `H2 size (${mobH2}px) does not scale down on mobile (390px) from desktop (${deskH2}px)`,
-    });
+  if (mobRec?.metrics) {
+    const mobH1 = mobRec.metrics.headings?.h1;
+    const mobH2 = mobRec.metrics.headings?.h2;
+    const mobBody = mobRec.metrics.bodyFont || 16;
+
+    if (deskH1 && mobH1) {
+      if (mobH1 > deskH1 + 4) {
+        mobRec.violations.push({
+          rule: 'heading-scale-inverted',
+          severity: 'warn',
+          selector: 'h1',
+          rect: null,
+          detail: `Mobile H1 (${mobH1}px) exceeds desktop H1 (${deskH1}px) indicating breakpoint style inversion`,
+        });
+      } else if (deskH1 > 28 && mobH1 >= deskH1) {
+        mobRec.violations.push({
+          rule: 'heading-scale-static',
+          severity: 'warn',
+          selector: 'h1',
+          rect: null,
+          detail: `H1 size (${mobH1}px) does not scale down on mobile (390px) from desktop (${deskH1}px)`,
+        });
+      }
+      if (mobH1 <= mobBody) {
+        mobRec.violations.push({
+          rule: 'heading-scale-undersized',
+          severity: 'error',
+          selector: 'h1',
+          rect: null,
+          detail: `H1 size (${mobH1}px) is less than or equal to base body font (${mobBody}px) on mobile`,
+        });
+      }
+    }
+
+    if (deskH2 && mobH2 && deskH2 > 24 && mobH2 >= deskH2) {
+      mobRec.violations.push({
+        rule: 'heading-scale-static',
+        severity: 'warn',
+        selector: 'h2',
+        rect: null,
+        detail: `H2 size (${mobH2}px) does not scale down on mobile (390px) from desktop (${deskH2}px)`,
+      });
+    }
   }
 }
 
