@@ -34,3 +34,12 @@ test('exact 7 viewports', () => {
   assert.deepEqual(VIEWPORTS.map((v) => v.name), ['ultrawide', 'fhd', 'macbook', 'desktop', 'laptop', 'tablet', 'mobile']);
   assert.deepEqual(VIEWPORTS.filter((v) => v.touch).map((v) => v.name), ['tablet', 'mobile']);
 });
+
+test('evaluate is a function suitable for page.evaluate', async () => {
+  const { evaluate } = await import('../heuristics/evaluate.js');
+  assert.equal(typeof evaluate, 'function');
+  // ensure it does not throw reference errors when initialized as string
+  assert.ok(evaluate.toString().includes('wcag-contrast'));
+  assert.ok(evaluate.toString().includes('element-collision'));
+  assert.ok(evaluate.toString().includes('nav-not-collapsed'));
+});

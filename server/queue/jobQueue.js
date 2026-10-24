@@ -88,6 +88,37 @@ function summarize(run) {
   return s;
 }
 
+function evaluateCrossViewport(page) {
+  const deskRec = page.viewports['desktop'] || page.viewports['fhd'] || page.viewports['ultrawide'];
+  const mobRec = page.viewports['mobile'];
+  if (!deskRec?.metrics || !mobRec?.metrics) return;
+
+  const deskH1 = deskRec.metrics.headings?.h1;
+  const mobH1 = mobRec.metrics.headings?.h1;
+  const mobBody = mobRec.metrics.bodyFont || 16;
+
+  if (deskH1 && mobH1) {
+    if (deskH1 > 28 && mobH1 >= deskH1) {
+      mobRec.violations.push({
+        rule: 'heading-scale-static',
+        severity: 'warn',
+        selector: 'h1',
+        rect: null,
+        detail: `H1 size (${mobH1}px) does not scale down on mobile (390px) from desktop (${deskH1}px)`,
+      });
+    }
+    if (mobH1 <= mobBody) {
+      mobRec.violations.push({
+        rule: 'heading-scale-undersized',
+        severity: 'error',
+        selector: 'h1',
+        rect: null,
+        detail: `H1 size (${mobH1}px) is less than or equal to base body font (${mobBody}px) on mobile`,
+      });
+    }
+  }
+}
+
 export async function processRun(runId) {
   const run = getRun(runId);
   if (!run || cancelled.has(runId)) return;
@@ -107,6 +138,7 @@ export async function processRun(runId) {
         if (cancelled.has(runId)) return;
         await processViewport(run, page, vp);
       }
+      evaluateCrossViewport(page);
       run.progress.pagesDone++;
       save(run);
     });
