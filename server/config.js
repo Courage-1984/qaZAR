@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export const config = {
+  host: process.env.HOST || '0.0.0.0',
   port: Number(process.env.PORT || 8787),
   dataDir: process.env.DATA_DIR || path.join(root, 'data'),
   allowPrivate: process.env.ALLOW_PRIVATE === '1',

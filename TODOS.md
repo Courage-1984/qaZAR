@@ -145,6 +145,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] In-app persistent advisory branding input toolbar in UI results header for on-the-fly report whitelabeling (`web/results.js`).
 - [x] Modularized cell view and capture inspection logic into dedicated `web/cellView.js` to preserve strict file size caps (<250 lines).
 
+### 28. Mobile & LAN Network Accessibility (Completed)
+- [x] Bound Express server to `0.0.0.0` (configurable via `HOST`) and logged LAN IP for direct mobile device access (`config.js`, `index.js`).
+- [x] Updated client `getApiBase()` to dynamically infer mobile/LAN hostnames and support query string `?api=` configuration (`web/api.js`, `web/submit.js`).
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)

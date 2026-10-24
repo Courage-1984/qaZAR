@@ -36,10 +36,31 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 
+import os from 'node:os';
+
+function getLocalIp() {
+  try {
+    const nets = os.networkInterfaces();
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name] || []) {
+        if (net.family === 'IPv4' && !net.internal) return net.address;
+      }
+    }
+  } catch {
+    /* fallback */
+  }
+  return null;
+}
+
 await ensurePortFree(config.port);
-const server = app.listen(config.port, () =>
-  console.log(`qaZAR API listening on http://localhost:${config.port}`)
-);
+const host = config.host || '0.0.0.0';
+const server = app.listen(config.port, host, () => {
+  const localIp = getLocalIp();
+  console.log(`qaZAR API listening on http://localhost:${config.port}`);
+  if (localIp) {
+    console.log(`qaZAR Mobile/LAN access: http://${localIp}:${config.port}`);
+  }
+});
 
 async function shutdown(signal) {
   console.log(`Received ${signal}, closing server and browser...`);

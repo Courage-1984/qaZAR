@@ -11,14 +11,14 @@ async function testApi() {
     apiStatus.textContent = '✓ Connected to ' + getApiBase();
     apiStatus.className = 'msg ok';
   } catch {
-    apiStatus.textContent = '✗ Cannot reach ' + getApiBase() + ' – is the server running?';
+    apiStatus.textContent = '✗ Cannot reach ' + getApiBase() + ' – if testing on mobile, enter your computer LAN IP (e.g. http://192.168.x.x:8787)';
     apiStatus.className = 'msg bad';
   }
 }
 testApi();
 
 $('api-save').addEventListener('click', () => {
-  setApiBase($('api_base').value || 'http://localhost:8787');
+  setApiBase($('api_base').value || getApiBase());
   testApi();
 });
 
