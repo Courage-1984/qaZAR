@@ -65,9 +65,18 @@ Promote run captures to baseline.
 Cancel an active run and delete its artifacts.
 
 ### `GET /api/runs/:id/report`
-Generates a standalone, executive-styled HTML quality assessment report.
-- Query parameter `download=1` triggers automatic file download attachment.
-- Includes executive health score (0–100), letter grade (A–F), conversion friction analysis, device matrix, and integrated lead-capture remediation CTA.
+Generates a client-ready quality assessment report or JSON health summary.
+- **Query Parameters**:
+  - `format=json`: Returns machine-readable JSON containing score, grade, clusters, dev effort estimation (`roiAssessment`), 3-tier roadmap, and tech stack profile.
+  - `email=agency@dev.com`: Customizes the recipient email in the lead generation CTA.
+  - `download=1`: Sets `Content-Disposition: attachment` to trigger automatic browser file download.
+- **HTML Report Features**:
+  - Executive health score (0–100), letter grade (A–F), and status assessment.
+  - Consolidated cross-viewport defect clustering (eliminating noise & duplication).
+  - Remediation vs. Rebuild developer effort calculation.
+  - 3-tier actionable implementation roadmap (Quick Wins, Core UX, Strategic Architecture).
+  - Print/PDF export stylesheet with page-break protection.
+  - One-click pre-formatted Markdown clipboard summary for Slack/Jira.
 
 
 ## Artifacts Endpoint

@@ -117,6 +117,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Live SSE connection status badge (`🟢 Live SSE`, `🟡 Polling`, `✓ Complete`) in results header (`web/results.js`).
 - [x] Stream state tracking across EventSource lifecycle and automatic fallback polling.
 
+### 21. Report API Specifications & Multi-Format Documentation (Completed)
+- [x] Documented JSON executive report schema (`GET /api/runs/:id/report?format=json`) in `docs/api.md`.
+- [x] Documented lead capture customization (`?email=`) and automated download parameters (`?download=1`).
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)
