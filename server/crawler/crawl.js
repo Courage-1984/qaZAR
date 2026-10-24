@@ -40,7 +40,7 @@ async function bfs(start, max, { renderJs = false, onProgress } = {}) {
         discovered.push(url);
         onProgress?.('crawling:bfs', `Discovered ${discovered.length} pages (${url})`);
         const html = await res.text();
-        pageSignals.push(extractCrawlSignals(html, url, elapsed));
+        pageSignals.push(extractCrawlSignals(html, url, elapsed, res.headers));
         links = extractLinks(html, url);
 
         // If static extraction found no links on start page, or renderJs requested -> try headless
@@ -102,7 +102,7 @@ export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs
       });
       if (res.ok) {
         const html = await res.text();
-        pageSignals.push(extractCrawlSignals(html, start, Math.round(performance.now() - t0)));
+        pageSignals.push(extractCrawlSignals(html, start, Math.round(performance.now() - t0), res.headers));
       }
     } catch {
       /* skip */

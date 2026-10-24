@@ -148,9 +148,17 @@ test('extractCrawlSignals detects tech stack, viewport meta, and lead contacts',
       </body>
     </html>
   `;
-  const signals = extractCrawlSignals(sampleHtml, 'https://shop.com/', 120);
+  const mockHeaders = {
+    'content-encoding': 'gzip',
+    'strict-transport-security': 'max-age=31536000',
+    'content-security-policy': "default-src 'self'",
+  };
+  const signals = extractCrawlSignals(sampleHtml, 'https://shop.com/', 120, mockHeaders);
   assert.equal(signals.hasViewportMeta, true);
   assert.equal(signals.hasTitle, true);
+  assert.equal(signals.security.isHttps, true);
+  assert.equal(signals.security.hasHsts, true);
+  assert.equal(signals.performance.compressed, true);
   assert.ok(signals.techStack.includes('Shopify'));
   assert.ok(signals.techStack.includes('Google Analytics/GTM'));
   assert.ok(signals.contacts.emails.includes('founder@shop.com'));
@@ -160,6 +168,8 @@ test('extractCrawlSignals detects tech stack, viewport meta, and lead contacts',
   const profile = aggregateSiteProfile([signals]);
   assert.equal(profile.avgResponseTimeMs, 120);
   assert.equal(profile.hasMissingViewportMeta, false);
+  assert.equal(profile.security.score, 100);
+  assert.equal(profile.assetHygiene.uncompressedCount, 0);
   assert.ok(profile.techStack.includes('Shopify'));
   assert.ok(profile.leadContacts.emails.includes('founder@shop.com'));
 });

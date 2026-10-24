@@ -10,7 +10,12 @@
  * @param {number} responseTimeMs
  * @returns {object}
  */
-export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0) {
+export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, headers = null) {
+  const getH = (name) => {
+    if (!headers) return null;
+    return typeof headers.get === 'function' ? headers.get(name) : headers[name.toLowerCase()] || null;
+  };
+
   const signals = {
     url,
     responseTimeMs,
@@ -20,6 +25,16 @@ export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0) {
     hasDescription: false,
     hasOpenGraph: false,
     techStack: [],
+    security: {
+      isHttps: url.startsWith('https:'),
+      hasHsts: Boolean(getH('strict-transport-security')),
+      hasCsp: Boolean(getH('content-security-policy')),
+      hasXFrame: Boolean(getH('x-frame-options')),
+    },
+    performance: {
+      compressed: Boolean(getH('content-encoding')),
+      unlazyImages: (html.match(/<img(?![^>]*\bloading\s*=\s*["']lazy["'])[^>]*>/gi) || []).length,
+    },
     contacts: {
       emails: [],
       phones: [],
@@ -111,12 +126,10 @@ export function aggregateSiteProfile(pageSignals = []) {
     avgResponseTimeMs: 0,
     hasMissingViewportMeta: false,
     detectedTech: new Set(),
-    leadContacts: {
-      emails: new Set(),
-      phones: new Set(),
-      socials: new Set(),
-    },
+    leadContacts: { emails: new Set(), phones: new Set(), socials: new Set() },
     seoScore: 100,
+    security: { isHttps: true, hasHsts: true, hasCsp: true, score: 100, flags: [] },
+    assetHygiene: { uncompressedCount: 0, unlazyImagesTotal: 0 },
   };
 
   if (!pageSignals.length) return profile;
@@ -133,7 +146,22 @@ export function aggregateSiteProfile(pageSignals = []) {
     if (!s.hasTitle) profile.seoScore -= 10;
     if (!s.hasDescription) profile.seoScore -= 5;
     if (!s.hasOpenGraph) profile.seoScore -= 5;
+
+    if (s.security) {
+      if (!s.security.isHttps) profile.security.isHttps = false;
+      if (!s.security.hasHsts) profile.security.hasHsts = false;
+      if (!s.security.hasCsp) profile.security.hasCsp = false;
+    }
+    if (s.performance) {
+      if (!s.performance.compressed) profile.assetHygiene.uncompressedCount++;
+      profile.assetHygiene.unlazyImagesTotal += s.performance.unlazyImages || 0;
+    }
   }
+
+  if (!profile.security.isHttps) { profile.security.score -= 40; profile.security.flags.push('Insecure HTTP'); }
+  if (!profile.security.hasHsts) { profile.security.score -= 20; profile.security.flags.push('Missing HSTS'); }
+  if (!profile.security.hasCsp) { profile.security.score -= 15; profile.security.flags.push('Missing CSP'); }
+  profile.security.score = Math.max(25, profile.security.score);
 
   profile.avgResponseTimeMs = Math.round(totalTime / pageSignals.length);
   profile.seoScore = Math.max(20, Math.min(100, profile.seoScore));
@@ -148,5 +176,11 @@ export function aggregateSiteProfile(pageSignals = []) {
       socials: [...profile.leadContacts.socials],
     },
     seoScore: profile.seoScore,
+    security: {
+      isHttps: profile.security.isHttps,
+      score: profile.security.score,
+      flags: profile.security.flags,
+    },
+    assetHygiene: profile.assetHygiene,
   };
 }

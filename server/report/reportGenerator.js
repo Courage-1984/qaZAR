@@ -144,12 +144,12 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
           <div class="val" style="font-size: 1rem; font-weight: 600;">${esc(run.siteProfile.techStack.join(', ') || 'Custom / Jamstack')}</div>
         </div>
         <div class="card">
-          <h3>Mobile Viewport Meta</h3>
-          <div class="val" style="font-size: 1rem;">${run.siteProfile.hasMissingViewportMeta ? '⚠️ Missing' : '✓ Configured'}</div>
+          <h3>Security &amp; Trust</h3>
+          <div class="val" style="font-size: 1rem; ${run.siteProfile.security?.score < 80 ? 'color: #ef4444;' : 'color: #10b981;'}">${run.siteProfile.security?.score || 100}/100 <small style="font-size: 0.75rem; display:block; color:var(--muted);">${esc(run.siteProfile.security?.flags?.join(', ') || '✓ Transport Protected')}</small></div>
         </div>
         <div class="card">
-          <h3>SEO Hygiene Score</h3>
-          <div class="val">${run.siteProfile.seoScore}/100</div>
+          <h3>Asset Compression</h3>
+          <div class="val" style="font-size: 1rem;">${run.siteProfile.assetHygiene?.uncompressedCount > 0 ? '⚠️ Uncompressed' : '✓ Gzip/Brotli'}</div>
         </div>
       </div>
     </section>` : ''}
