@@ -18,11 +18,12 @@ export function extractLinks(html, baseUrl) {
  * Breadth-first crawl from a starting URL.
  * Extracts lightweight performance, tech stack, and lead signals on the fly.
  */
-async function bfs(start, max, { renderJs = false } = {}) {
+async function bfs(start, max, { renderJs = false, onProgress } = {}) {
   const seen = new Set([start]);
   const queue = [start];
   const discovered = [];
   const pageSignals = [];
+  onProgress?.('crawling:bfs', `Discovered 1 URL (${start})`);
 
   while (queue.length && discovered.length < max * 2) {
     const url = queue.shift();
@@ -37,6 +38,7 @@ async function bfs(start, max, { renderJs = false } = {}) {
 
       if (res.ok && (res.headers.get('content-type') || '').includes('html')) {
         discovered.push(url);
+        onProgress?.('crawling:bfs', `Discovered ${discovered.length} pages (${url})`);
         const html = await res.text();
         pageSignals.push(extractCrawlSignals(html, url, elapsed));
         links = extractLinks(html, url);
@@ -59,7 +61,9 @@ async function bfs(start, max, { renderJs = false } = {}) {
     }
   }
 
+  onProgress?.('crawling:prioritizing', `Scoring ROI across ${discovered.length} candidates...`);
   const urls = selectTopRoiCandidates(discovered, max);
+  onProgress?.('crawling:profiling', `Aggregating site tech & lead profile...`);
   const siteProfile = aggregateSiteProfile(pageSignals);
   return { urls, siteProfile };
 }
@@ -69,8 +73,9 @@ async function bfs(start, max, { renderJs = false } = {}) {
  * Applies ROI ranking and profiles site technical debt and lead intelligence.
  * Returns { urls, source, siteProfile }.
  */
-export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs = false }) {
+export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs = false, onProgress }) {
   const start = normalizeUrl(domain);
+  onProgress?.('crawling:sitemap', `Discovering sitemaps for ${domain}...`);
   const candidates = sitemap_url ? [sitemap_url] : await discoverSitemaps(domain);
   const sitemapUrls = [];
 
@@ -85,8 +90,9 @@ export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs
 
   const uniq = [...new Set(sitemapUrls)];
   if (uniq.length) {
+    onProgress?.('crawling:prioritizing', `Prioritizing top ${max_pages} ROI URLs from sitemap...`);
     const prioritized = selectTopRoiCandidates(uniq, max_pages);
-    // Cheap root fetch for tech stack and lead contact extraction on sitemap runs
+    onProgress?.('crawling:profiling', `Profiling ${start} infrastructure & leads...`);
     const pageSignals = [];
     try {
       const t0 = performance.now();
@@ -104,6 +110,7 @@ export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs
     return { urls: prioritized, source: 'sitemap', siteProfile: aggregateSiteProfile(pageSignals) };
   }
 
-  const { urls, siteProfile } = await bfs(start, max_pages, { renderJs });
+  onProgress?.('crawling:bfs', `Starting BFS discovery crawl on ${start}...`);
+  const { urls, siteProfile } = await bfs(start, max_pages, { renderJs, onProgress });
   return { urls: urls.length ? urls : [start], source: 'crawl', siteProfile };
 }

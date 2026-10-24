@@ -4,6 +4,7 @@ import path from 'node:path';
 import { config } from '../config.js';
 import { buildQueue } from '../crawler/crawl.js';
 import { slugFor } from '../crawler/normalize.js';
+import { scoreUrl } from '../crawler/roiScorer.js';
 import { capturePage, VIEWPORTS } from '../engine/capturePage.js';
 import { baselinePath, hasBaseline, promote } from '../visual/baseline.js';
 import { diffImages } from '../visual/diff.js';
@@ -137,12 +138,28 @@ export async function processRun(runId) {
   if (!run || cancelled.has(runId)) return;
   try {
     run.status = 'crawling';
+    run.crawlStage = 'sitemap';
     save(run);
-    const { urls, source, siteProfile } = await buildQueue(run.input);
+    const { urls, source, siteProfile } = await buildQueue({
+      ...run.input,
+      onProgress: (stage, message) => {
+        run.crawlStage = stage;
+        run.crawlMessage = message;
+        save(run);
+      },
+    });
     if (!urls.length) throw new Error('No pages found (sitemap empty and crawl found nothing)');
     run.crawlSource = source;
     run.siteProfile = siteProfile || null;
-    run.pages = urls.map((url) => ({ url, slug: slugFor(url), viewports: {} }));
+    run.pages = urls.map((url) => {
+      const scored = scoreUrl(url);
+      return {
+        url,
+        slug: slugFor(url),
+        roi: { score: scored.score, label: scored.labels[0] || 'page' },
+        viewports: {},
+      };
+    });
     run.progress = { pagesDone: 0, pagesTotal: urls.length };
     run.status = 'capturing';
     save(run);

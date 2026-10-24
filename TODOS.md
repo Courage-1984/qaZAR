@@ -63,10 +63,11 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Integrated Crawl & Lead Intelligence badge strip in `web/results.js` (latency, tech stack, mobile viewport check, lead email).
 - [x] Unit test suite for site profiler and lead signal aggregation in `server/test/unit.test.js`.
 
-### 9. Crawler & Report Iteration with MVP Progress Markers (Active / Next)
-- [ ] Granular crawl progress markers streamed over SSE (`crawling:sitemap`, `crawling:bfs`, `crawling:profiling`, `crawling:prioritizing`).
-- [ ] Expose ROI score breakdown and commercial weight factors in UI run view.
-- [ ] Exportable JSON summary and customizable lead capture agency email in report generator.
+### 9. Crawler & Report Iteration with MVP Progress Markers (Completed)
+- [x] Granular crawl progress markers streamed over SSE (`crawling:sitemap`, `crawling:bfs`, `crawling:profiling`, `crawling:prioritizing`).
+- [x] Expose ROI score breakdown and commercial weight factors in UI run view (page tags e.g. `pricing · 95pts`).
+- [x] Exportable JSON summary (`?format=json`) and customizable lead capture agency email (`?email=`) in report generator.
+- [x] Automatic stale process detection and auto-termination on port 8787 upon server start (`server/freePort.js`).
 
 ---
 

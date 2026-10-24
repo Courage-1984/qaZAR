@@ -4,6 +4,7 @@ import { cancelRun, enqueue } from '../queue/jobQueue.js';
 import { promoteRun } from '../visual/baseline.js';
 import { validateRunInput } from './validate.js';
 import { generateExecutiveReport } from '../report/reportGenerator.js';
+import { calculateHealthScore } from '../report/scoreCalculator.js';
 
 export const runsRouter = Router();
 
@@ -28,7 +29,21 @@ runsRouter.get('/:id', (req, res) => {
 runsRouter.get('/:id/report', (req, res) => {
   const run = getRun(req.params.id);
   if (!run) return res.status(404).json({ error: 'Run not found' });
-  const html = generateExecutiveReport(run);
+  const leadEmail = req.query.email || 'consulting@qazar.dev';
+
+  if (req.query.format === 'json' || req.query.json === '1') {
+    const health = calculateHealthScore(run);
+    return res.json({
+      runId: run.id,
+      domain: run.input?.domain,
+      createdAt: run.createdAt,
+      health,
+      siteProfile: run.siteProfile || null,
+      summary: run.summary || null,
+    });
+  }
+
+  const html = generateExecutiveReport(run, leadEmail);
   if (req.query.download === '1') {
     const safeDomain = run.input?.domain?.replace(/https?:\/\//, '').replace(/[^a-zA-Z0-9.-]/g, '_') || run.id;
     res.setHeader('Content-Disposition', `attachment; filename="qaZAR-audit-${safeDomain}.html"`);

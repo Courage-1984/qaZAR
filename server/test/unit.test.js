@@ -150,5 +150,13 @@ test('extractCrawlSignals detects tech stack, viewport meta, and lead contacts',
   assert.ok(profile.leadContacts.emails.includes('founder@shop.com'));
 });
 
+test('ensurePortFree runs without unhandled errors on any port', async () => {
+  const { ensurePortFree } = await import('../freePort.js');
+  assert.equal(typeof ensurePortFree, 'function');
+  await assert.doesNotReject(async () => {
+    await ensurePortFree(59999);
+  });
+});
+
 
 

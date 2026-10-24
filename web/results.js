@@ -58,7 +58,7 @@ function renderDetail(run) {
   const s = run.summary;
   const rows = run.pages
     .map(
-      (p) => `<tr><td class="url"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(new URL(p.url).pathname + new URL(p.url).search)}</a></td>
+      (p) => `<tr><td class="url"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(new URL(p.url).pathname + new URL(p.url).search)}</a>${p.roi ? `<span class="badge" style="font-size:0.7rem; margin-left:0.4rem; background:rgba(99,102,241,0.15); color:#818cf8;">${esc(p.roi.label)} · ${p.roi.score}pts</span>` : ''}</td>
       ${VPS.map((vp) => {
         const rec = p.viewports[vp];
         const c = cellInfo(rec);
@@ -68,11 +68,12 @@ function renderDetail(run) {
     )
     .join('');
   const active = !['done', 'failed', 'cancelled'].includes(run.status);
+  const statusLabel = run.crawlMessage && active ? `${run.status}: ${run.crawlMessage}` : run.status;
   app.innerHTML = `
     <p><a href="./results.html">← All runs</a></p>
     <h1>${esc(run.input.domain)}</h1>
     <div class="stats">
-      <div class="stat"><span class="badge ${esc(run.status)}">${esc(run.status)}</span><small>${esc(run.id)}</small></div>
+      <div class="stat"><span class="badge ${esc(run.status)}">${esc(statusLabel)}</span><small>${esc(run.id)}</small></div>
       <div class="stat"><b>${run.progress.pagesDone}/${run.progress.pagesTotal}</b><small>pages</small></div>
       ${s ? `<div class="stat"><b>${s.violations.error}</b><small>errors</small></div><div class="stat"><b>${s.violations.warn}</b><small>warnings</small></div><div class="stat"><b>${s.changed}</b><small>visual changes</small></div><div class="stat"><b>${s.new}</b><small>new baselines</small></div>` : ''}
     </div>
@@ -90,6 +91,7 @@ function renderDetail(run) {
     <div class="row" style="margin: 1rem 0; gap: 0.5rem; flex-wrap: wrap;">
       <a class="btn primary" href="${api.reportUrl(run.id, true)}" download>📥 Download Executive Report</a>
       <a class="btn" href="${api.reportUrl(run.id, false)}" target="_blank" rel="noopener">👁️ View Report</a>
+      <a class="btn" href="${api.reportUrl(run.id, false)}&format=json" target="_blank" rel="noopener">{ } JSON Summary</a>
       ${run.status === 'done' ? '<button class="btn" id="promote-all">Set all captures as baseline</button>' : ''}
     </div>
     ${run.status === 'done' ? `

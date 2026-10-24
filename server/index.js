@@ -5,6 +5,7 @@ import { config, runsDir } from './config.js';
 import { loadAll, listRuns } from './storage/runStore.js';
 import { runsRouter } from './routes/runs.js';
 import { closeBrowser } from './engine/capturePage.js';
+import { ensurePortFree } from './freePort.js';
 
 loadAll();
 const app = express();
@@ -35,6 +36,7 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 });
 
+await ensurePortFree(config.port);
 const server = app.listen(config.port, () =>
   console.log(`qaZAR API listening on http://localhost:${config.port}`)
 );
