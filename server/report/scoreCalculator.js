@@ -132,7 +132,30 @@ export function calculateHealthScore(run) {
     },
     clusters,
     roiAssessment: estimateRemediationRoi(run, finalScore, errorClusters.length, warnClusters.length, clusters.filter((c) => c.isGlobal).length),
+    roadmap: generateActionRoadmap(run, categories, clusters),
   };
+}
+
+export function generateActionRoadmap(run, categories = {}, clusters = []) {
+  const p = run.siteProfile || {};
+  const quickWins = [];
+  const coreUx = [];
+  const strategic = [];
+
+  if (p.funnel?.brokenLinks?.length) quickWins.push(`Repair ${p.funnel.brokenLinks.length} broken link(s) to protect conversions.`);
+  if (p.assetHygiene?.blockingScriptsTotal > 0) quickWins.push(`Add async/defer to ${p.assetHygiene.blockingScriptsTotal} render-blocking head script(s).`);
+  if (p.assetHygiene?.unlazyImagesTotal > 3) quickWins.push(`Add loading="lazy" across ${p.assetHygiene.unlazyImagesTotal} off-screen image(s).`);
+  if (p.hasMissingViewportMeta) quickWins.push('Add standard mobile viewport meta tag for responsive scaling.');
+
+  if (categories.mobileTouch > 0) coreUx.push(`Enlarge ${categories.mobileTouch} touch target(s) to meet the 48x48px accessibility minimum.`);
+  if (categories.overflowBreakage > 0) coreUx.push(`Constrain ${categories.overflowBreakage} layout element(s) causing horizontal viewport overflow.`);
+  if (categories.wcagContrast > 0) coreUx.push(`Adjust colors for ${categories.wcagContrast} text element(s) failing WCAG AA 4.5:1 contrast.`);
+
+  const globalCount = clusters.filter((c) => c.isGlobal).length;
+  if (globalCount > 0) strategic.push(`Refactor ${globalCount} shared component(s) causing systemic multi-page breakage.`);
+  if (p.security?.score < 80) strategic.push(`Harden transport security headers (${(p.security.flags || []).join(', ')}).`);
+
+  return { quickWins, coreUx, strategic };
 }
 
 export function estimateRemediationRoi(run, score, distinctErrors, distinctWarnings, globalDefects) {

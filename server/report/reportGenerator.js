@@ -16,7 +16,7 @@ function esc(s) {
  * designed to capture qualified inbound leads for site redesigns/rebuilds.
  */
 export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev') {
-  const { score, grade, status, recommendation, metrics, clusters, roiAssessment } = calculateHealthScore(run);
+  const { score, grade, status, recommendation, metrics, clusters, roiAssessment, roadmap } = calculateHealthScore(run);
   const domain = run.input?.domain || 'Unknown Domain';
   const dateStr = new Date(run.createdAt || Date.now()).toLocaleDateString('en-US', {
     month: 'short',
@@ -189,6 +189,25 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev')
           ${c.selector ? `<div style="color:var(--muted); font-family:monospace; font-size:0.75rem; margin-top:0.25rem;">${esc(c.selector)}</div>` : ''}
         </div>
       `).join('')}
+    </section>` : ''}
+
+    ${(roadmap && (roadmap.quickWins.length || roadmap.coreUx.length || roadmap.strategic.length)) ? `
+    <section class="impact-section">
+      <h2>Prioritized Implementation Roadmap</h2>
+      <div class="grid" style="margin-bottom:0;">
+        <div class="card" style="border-top:3px solid #10b981;">
+          <h3 style="color:#10b981;">Tier 1 · Quick Wins</h3>
+          ${roadmap.quickWins.map((w) => `<div style="font-size:0.85rem; margin-bottom:0.35rem;">⚡ ${esc(w)}</div>`).join('') || '<div style="font-size:0.85rem; color:var(--muted);">✓ No quick blockers.</div>'}
+        </div>
+        <div class="card" style="border-top:3px solid #f59e0b;">
+          <h3 style="color:#f59e0b;">Tier 2 · UX &amp; Accessibility</h3>
+          ${roadmap.coreUx.map((u) => `<div style="font-size:0.85rem; margin-bottom:0.35rem;">🛠️ ${esc(u)}</div>`).join('') || '<div style="font-size:0.85rem; color:var(--muted);">✓ Layout compliant.</div>'}
+        </div>
+        <div class="card" style="border-top:3px solid #6366f1;">
+          <h3 style="color:#818cf8;">Tier 3 · Strategic Architecture</h3>
+          ${roadmap.strategic.map((s) => `<div style="font-size:0.85rem; margin-bottom:0.35rem;">🏛️ ${esc(s)}</div>`).join('') || '<div style="font-size:0.85rem; color:var(--muted);">✓ Sound architecture.</div>'}
+        </div>
+      </div>
     </section>` : ''}
 
     ${roiAssessment ? `

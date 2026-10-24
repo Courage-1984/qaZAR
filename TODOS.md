@@ -89,6 +89,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Commercial form intent & insecure HTTP post detection (`siteProfiler.js`).
 - [x] Enriched asset hygiene and lead conversion cards in executive reports and UI results.
 
+### 14. Actionable 3-Tier Remediation Roadmap (Completed)
+- [x] Prioritized implementation roadmap generator (`scoreCalculator.js`): Tier 1 Quick Wins (<1h), Tier 2 UX & Accessibility, Tier 3 Strategic Architecture.
+- [x] Native visual rendering in executive audit reports and print/PDF views (`reportGenerator.js`).
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)

@@ -114,6 +114,9 @@ test('calculateHealthScore and clusterDefects eliminate noise and group patterns
   assert.equal(result.metrics.rawErrors, 3);
   assert.ok(result.roiAssessment.estimatedHours > 0);
   assert.ok(result.roiAssessment.recommendationTitle);
+  assert.ok(result.roadmap);
+  assert.ok(result.roadmap.coreUx.length > 0);
+  assert.ok(result.roadmap.strategic.length > 0);
 });
 
 test('generateExecutiveReport produces standalone HTML with lead generation CTA', async () => {
