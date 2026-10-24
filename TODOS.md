@@ -109,6 +109,10 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Polite crawler compliance: respects robots.txt `Disallow` rules across BFS and sitemaps (`crawl.js`).
 - [x] Parsed `Crawl-delay` and sitemap declarations (`robots.js`).
 
+### 19. One-Click Executive Summary Clipboard Export (Completed)
+- [x] Pre-formatted Markdown executive summary generator for Jira/Slack sharing (`reportGenerator.js`).
+- [x] Interactive copy button with instant browser clipboard integration.
+
 ---
 
 ## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)
