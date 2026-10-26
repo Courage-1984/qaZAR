@@ -45,10 +45,10 @@
 
     <section class="card" aria-labelledby="api-title">
       <h2 id="api-title">Backend</h2>
-      <p class="muted">The UI talks to a qaZAR API server (Playwright can't run on GitHub Pages). Run <code>npm run server</code> locally.</p>
+      <p class="muted">Playwright runs on your qaZAR server, not on GitHub Pages. Start <code>npm run server</code> and this page connects to its public HTTPS address automatically.</p>
       <label for="api_base">API base URL</label>
       <div class="row">
-        <input id="api_base" type="url" placeholder="http://localhost:8787">
+        <input id="api_base" type="url" placeholder="https://your-qazar-server">
         <button id="api-save" class="btn" type="button">Save &amp; test</button>
       </div>
       <p id="api-status" class="msg" role="status"></p>

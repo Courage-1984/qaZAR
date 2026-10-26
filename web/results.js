@@ -1,16 +1,23 @@
-import { api, esc } from './api.js';
+import { api, esc, getApiBase } from './api.js';
 import { cellInfo, renderCell } from './cellView.js';
 
 const app = document.getElementById('app');
 const VPS = ['ultrawide', 'fhd', 'macbook', 'desktop', 'laptop', 'tablet', 'mobile'];
 const id = new URLSearchParams(location.search).get('id');
+const samePage = (path) => {
+  const base = getApiBase();
+  if (!base) return path;
+  const u = new URL(path, location.href);
+  u.searchParams.set('api', base);
+  return `${u.pathname.split('/').pop()}${u.search}`;
+};
 let timer;
 let selected = null; // {slug, vp}
 
 const fmtDate = (s) => new Date(s).toLocaleString();
 const fail = (e) => {
   app.innerHTML = `<h1>Results</h1><div class="card"><p class="msg bad">${esc(e.message)}</p>
-    <p class="muted">Check the API base URL on the <a href="./index.html">Submit</a> page, or auto-detect below.</p>
+    <p class="muted">Check the API base URL on the <a href="${samePage('./index.html')}">Submit</a> page, or auto-detect below.</p>
     <button class="btn sm" id="retry-discovery">Auto-Detect Server</button>
   </div>`;
   document.getElementById('retry-discovery')?.addEventListener('click', async () => {
@@ -29,10 +36,11 @@ const fail = (e) => {
 async function renderList() {
   try {
     const runs = await api.listRuns();
+    if (!Array.isArray(runs)) throw new Error('The API did not return a run list.');
     app.innerHTML = `<h1>Results</h1>
       <div class="card"><table class="tbl" id="runs-table"><thead><tr><th>Run</th><th>Domain</th><th>Status</th><th>Pages</th><th>Errors</th><th>Changed</th><th></th></tr></thead><tbody>
       ${runs.map((r) => `<tr>
-        <td><a href="?id=${encodeURIComponent(r.id)}">${esc(r.id)}</a><div class="muted sm">${esc(fmtDate(r.createdAt))}</div></td>
+        <td><a href="${samePage(`?id=${encodeURIComponent(r.id)}`)}">${esc(r.id)}</a><div class="muted sm">${esc(fmtDate(r.createdAt))}</div></td>
         <td>${esc(r.input.domain)}</td>
         <td><span class="badge ${esc(r.status)}">${esc(r.status)}</span></td>
         <td>${r.progress.pagesDone}/${r.progress.pagesTotal}</td>
@@ -41,7 +49,7 @@ async function renderList() {
         <td>
           <a class="btn sm" href="${api.reportUrl(r.id, true)}" download title="Download Executive Report">Report</a>
           <button class="btn sm danger" data-del="${esc(r.id)}" aria-label="Delete run ${esc(r.id)}">Delete</button>
-        </td></tr>`).join('') || '<tr><td colspan="7" class="muted">No runs yet. <a href="./index.html">Start one</a>.</td></tr>'}
+        </td></tr>`).join('') || `<tr><td colspan="7" class="muted">No runs yet. <a href="${samePage('./index.html')}">Start one</a>.</td></tr>`}
       </tbody></table></div>`;
     app.querySelectorAll('[data-del]').forEach((b) =>
       b.addEventListener('click', async () => {
@@ -63,7 +71,7 @@ let streamState = 'idle';
 
 function renderDetail(run) {
   const s = run.summary;
-  const filtered = run.pages.filter((p) => {
+  const filtered = (run.pages || []).filter((p) => {
     if (query && !p.url.toLowerCase().includes(query.toLowerCase())) return false;
     if (filter === 'all') return true;
     const vps = Object.values(p.viewports || {});
@@ -77,7 +85,7 @@ function renderDetail(run) {
     .map(
       (p) => `<tr><td class="url"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(new URL(p.url).pathname + new URL(p.url).search)}</a>${p.roi ? `<span class="badge" style="font-size:0.7rem; margin-left:0.4rem; background:rgba(99,102,241,0.15); color:#818cf8;">${esc(p.roi.label)} · ${p.roi.score}pts</span>` : ''}</td>
       ${VPS.map((vp) => {
-        const rec = p.viewports[vp];
+        const rec = p.viewports?.[vp];
         const c = cellInfo(rec);
         const sel = selected && selected.slug === p.slug && selected.vp === vp ? ' sel' : '';
         return `<td><button class="cell ${c.cls}${sel}" data-slug="${esc(p.slug)}" data-vp="${vp}" aria-label="${esc(p.url)} ${vp}">${esc(c.label)}</button></td>`;
@@ -86,9 +94,10 @@ function renderDetail(run) {
     .join('');
   const active = !['done', 'failed', 'cancelled'].includes(run.status);
   const liveBadge = active && streamState === 'sse' ? ' · 🟢 Live SSE' : active && streamState === 'poll' ? ' · 🟡 Polling' : '';
+  const statusLabel = run.status === 'done' ? '✓ Complete' : run.status;
   const savedAgency = localStorage.getItem('qazar.agency') || '';
   app.innerHTML = `
-    <p><a href="./results.html">← All runs</a></p>
+    <p><a href="${samePage('./results.html')}">← All runs</a></p>
     <h1>${esc(run.input.domain)}</h1>
     <div class="stats">
       <div class="stat"><span class="badge ${esc(run.status)}">${esc(statusLabel)}${liveBadge}</span><small>${esc(run.id)}</small></div>
