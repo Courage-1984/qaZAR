@@ -30,9 +30,12 @@
       <form id="run-form" novalidate>
         <label for="domain">Domain</label>
         <input id="domain" name="domain" type="url" required placeholder="https://example.com" autocomplete="url">
+        <label for="pages">Specific pages <span class="muted">(optional)</span></label>
+        <textarea id="pages" name="pages" rows="5" placeholder="https://example.com/pricing&#10;/about"></textarea>
+        <p class="muted sm">One URL or path per line. When this list is filled, the crawl stays on these pages and skips the sitemap.</p>
         <label for="sitemap_url">Sitemap URL <span class="muted">(optional)</span></label>
         <input id="sitemap_url" name="sitemap_url" type="url" placeholder="https://example.com/sitemap.xml">
-        <label for="max_pages">Max pages</label>
+        <label for="max_pages">Max pages <span class="muted">(used when no specific pages are listed)</span></label>
         <input id="max_pages" name="max_pages" type="number" min="1" max="200" value="10">
         <div class="row checkbox-row" style="margin: 1rem 0; display: flex; align-items: center; gap: 0.5rem;">
           <input id="render_js" name="render_js" type="checkbox">

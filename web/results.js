@@ -99,6 +99,7 @@ function renderDetail(run) {
   app.innerHTML = `
     <p><a href="${samePage('./results.html')}">← All runs</a></p>
     <h1>${esc(run.input.domain)}</h1>
+    ${run.input.pages?.length ? `<p class="muted sm">Crawl limited to ${run.input.pages.length} submitted page${run.input.pages.length === 1 ? '' : 's'}.</p>` : ''}
     <div class="stats">
       <div class="stat"><span class="badge ${esc(run.status)}">${esc(statusLabel)}${liveBadge}</span><small>${esc(run.id)}</small></div>
       <div class="stat"><b>${run.progress.pagesDone}/${run.progress.pagesTotal}</b><small>pages</small></div>
@@ -133,7 +134,8 @@ function renderDetail(run) {
       </div>
     ` : ''}
     ${run.error ? `<p class="msg bad">${esc(run.error)}</p>` : ''}
-    ${active ? '<div class="bar"><i style="width:' + (run.progress.pagesTotal ? (run.progress.pagesDone / run.progress.pagesTotal) * 100 : 5) + '%"></i></div>' : ''}
+    ${run.status === 'crawling' && run.crawlMessage ? `<p class="muted">${esc(run.crawlMessage)}</p>` : ''}
+    ${active ? '<div class="bar"><i style="width:' + (run.progress.pagesTotal ? Math.round((run.progress.pagesDone / run.progress.pagesTotal) * 100) : 8) + '%"></i></div>' : ''}
     ${run.pages.length ? `
       <div class="row" style="margin:1rem 0 0.5rem 0; gap:0.5rem; align-items:center; flex-wrap:wrap;">
         <input type="search" id="page-search" placeholder="Search pages..." value="${esc(query)}" style="padding:0.35rem 0.6rem; border-radius:6px; background:var(--card); border:1px solid var(--border); color:#fff; font-size:0.85rem; width:180px;">
@@ -200,39 +202,33 @@ async function fetchAndRender() {
 }
 
 function fallbackPoll() {
-  streamState = 'poll';
+  if (streamState !== 'sse') streamState = 'poll';
   if (timer) clearTimeout(timer);
   timer = setTimeout(async () => {
     const run = await fetchAndRender();
-    if (run && !['done', 'failed', 'cancelled'].includes(run.status)) {
-      fallbackPoll();
-    }
+    if (run && !['done', 'failed', 'cancelled'].includes(run.status)) fallbackPoll();
   }, 2000);
 }
 
 async function startWatching() {
   const initial = await fetchAndRender();
   if (!initial || ['done', 'failed', 'cancelled'].includes(initial.status)) return;
-
-  if (typeof EventSource !== 'undefined') {
-    try {
-      eventSource = new EventSource(api.eventsUrl(id));
-      streamState = 'sse';
-      eventSource.onmessage = () => fetchAndRender();
-      eventSource.onerror = () => {
-        streamState = 'poll';
-        if (eventSource) {
-          eventSource.close();
-          eventSource = null;
-        }
-        fallbackPoll();
-      };
-      return;
-    } catch {
-      /* fallback */
-    }
-  }
+  // Poll even when SSE is open. Cloudflare tunnels buffer the event stream, which
+  // otherwise leaves the page on the first "crawling · 0/0" snapshot.
   fallbackPoll();
+  if (typeof EventSource === 'undefined') return;
+  try {
+    eventSource = new EventSource(api.eventsUrl(id));
+    streamState = 'sse';
+    eventSource.onmessage = () => fetchAndRender();
+    eventSource.onerror = () => {
+      streamState = 'poll';
+      eventSource?.close();
+      eventSource = null;
+    };
+  } catch {
+    /* poll already running */
+  }
 }
 
 if (id) startWatching();

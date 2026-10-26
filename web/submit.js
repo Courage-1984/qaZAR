@@ -51,6 +51,7 @@ $('run-form').addEventListener('submit', async (e) => {
     const { runId } = await api.createRun({
       domain,
       sitemap_url: $('sitemap_url').value.trim(),
+      pages: $('pages').value,
       max_pages: Number($('max_pages').value) || 10,
       renderJs: Boolean($('render_js')?.checked),
     });

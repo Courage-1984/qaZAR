@@ -66,17 +66,24 @@ runsRouter.get('/:id/events', (req, res) => {
     'X-Accel-Buffering': 'no',
   });
   res.flushHeaders?.();
+  // Pad past Cloudflare's proxy buffer so events are not held until the run ends.
+  res.write(`:${' '.repeat(4096)}\n\n`);
 
-  res.write(`data: ${JSON.stringify({ status: run.status, progress: run.progress, summary: run.summary })}\n\n`);
+  const push = () => {
+    const current = getRun(req.params.id);
+    if (!current) return;
+    res.write(`data: ${JSON.stringify({ status: current.status, progress: current.progress, summary: current.summary })}\n\n`);
+  };
+  push();
   subscribe(run.id, res);
 
   const keepAlive = setInterval(() => {
     try {
-      res.write(': keep-alive\n\n');
+      push();
     } catch {
       clearInterval(keepAlive);
     }
-  }, 15000);
+  }, 2000);
 
   res.on('close', () => clearInterval(keepAlive));
 });

@@ -1,6 +1,7 @@
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import { config } from '../config.js';
+import { resolveExplicitPages } from '../crawler/explicitPages.js';
 
 function isPrivateIp(ip) {
   if (net.isIPv4(ip)) {
@@ -34,6 +35,15 @@ export async function validateRunInput(body = {}) {
   if (sitemap_url) sitemap_url = await assertPublicUrl(sitemap_url, 'sitemap_url');
   const n = Number.parseInt(body.max_pages ?? 10, 10);
   if (!Number.isFinite(n) || n < 1) throw new Error('max_pages must be a positive integer');
+  const listed = resolveExplicitPages(domain, body.pages);
+  for (const page of listed) await assertPublicUrl(page, 'page');
+  const pages = listed.length ? listed : null;
   const renderJs = Boolean(body.renderJs);
-  return { domain, sitemap_url: sitemap_url || null, max_pages: Math.min(n, config.maxPagesCap), renderJs };
+  return {
+    domain,
+    sitemap_url: pages ? null : sitemap_url || null,
+    max_pages: pages ? pages.length : Math.min(n, config.maxPagesCap),
+    renderJs,
+    pages,
+  };
 }

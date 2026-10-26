@@ -72,13 +72,39 @@ async function bfs(start, max, { renderJs = false, onProgress, disallows = [] } 
   return { urls, siteProfile };
 }
 
+async function profilePage(url) {
+  const pageSignals = [];
+  try {
+    const t0 = performance.now();
+    const res = await fetch(url, {
+      headers: { 'user-agent': 'qaZAR/0.1' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (res.ok) {
+      const html = await res.text();
+      pageSignals.push(extractCrawlSignals(html, url, Math.round(performance.now() - t0), res.headers));
+    }
+  } catch {
+    /* skip unreachable profile target */
+  }
+  return aggregateSiteProfile(pageSignals);
+}
+
 /**
- * Build the page queue: explicit sitemap -> auto-discovered sitemap -> BFS.
+ * Build the page queue: submitted pages, else sitemap, else BFS.
  * Applies ROI ranking and profiles site technical debt and lead intelligence.
  * Returns { urls, source, siteProfile }.
  */
-export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs = false, onProgress }) {
+export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs = false, pages = null, onProgress }) {
   const start = normalizeUrl(domain);
+  if (pages?.length) {
+    const urls = pages.slice(0, max_pages);
+    const noun = urls.length === 1 ? 'page' : 'pages';
+    onProgress?.('crawling:pages', `Limiting crawl to ${urls.length} submitted ${noun}`);
+    const siteProfile = await profilePage(urls[0]);
+    siteProfile.crawlMeta = { hasRobotsTxt: false, hasSitemap: false, explicitPages: true };
+    return { urls, source: 'pages', siteProfile };
+  }
   const origin = new URL(start).origin;
 
   let disallows = [];
@@ -115,21 +141,7 @@ export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs
     onProgress?.('crawling:prioritizing', `Prioritizing top ${max_pages} ROI URLs from sitemap...`);
     const prioritized = selectTopRoiCandidates(uniq, max_pages);
     onProgress?.('crawling:profiling', `Profiling ${start} infrastructure & leads...`);
-    const pageSignals = [];
-    try {
-      const t0 = performance.now();
-      const res = await fetch(start, {
-        headers: { 'user-agent': 'qaZAR/0.1' },
-        signal: AbortSignal.timeout(10000),
-      });
-      if (res.ok) {
-        const html = await res.text();
-        pageSignals.push(extractCrawlSignals(html, start, Math.round(performance.now() - t0), res.headers));
-      }
-    } catch {
-      /* skip */
-    }
-    const siteProfile = aggregateSiteProfile(pageSignals);
+    const siteProfile = await profilePage(start);
     siteProfile.crawlMeta = { hasRobotsTxt, hasSitemap: true };
     return { urls: prioritized, source: 'sitemap', siteProfile };
   }
