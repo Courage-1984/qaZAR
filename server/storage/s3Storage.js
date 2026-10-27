@@ -1,9 +1,6 @@
 import fs from 'node:fs';
 import { DeleteObjectsCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-
-function siteHash(domain) {
-  return String(domain || '').replace(/https?:\/\//, '').replace(/[^a-zA-Z0-9.-]/g, '_');
-}
+import { ownerSeg, siteHash } from './paths.js';
 
 let built = 0;
 export const s3ClientsBuilt = () => built;
@@ -31,8 +28,12 @@ export class S3Storage {
   get baselinesRoot() { return this.local.baselinesRoot; }
   getRunDir(id) { return this.local.getRunDir(id); }
   getArtifactPath(id, rel) { return this.local.getArtifactPath(id, rel); }
-  getBaselinePath(domain, slug, viewport) { return this.local.getBaselinePath(domain, slug, viewport); }
-  hasBaseline(domain, slug, viewport) { return this.local.hasBaseline(domain, slug, viewport); }
+  getBaselinePath(domain, slug, viewport, ownerId) {
+    return this.local.getBaselinePath(domain, slug, viewport, ownerId);
+  }
+  hasBaseline(domain, slug, viewport, ownerId) {
+    return this.local.hasBaseline(domain, slug, viewport, ownerId);
+  }
 
   async put(key, body) {
     await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body }));
@@ -65,9 +66,9 @@ export class S3Storage {
     await this.put(`runs/${runId}/${rel}`, fs.readFileSync(abs));
   }
 
-  saveBaseline(domain, slug, viewport, sourceFile) {
-    const dest = this.local.saveBaseline(domain, slug, viewport, sourceFile);
-    const key = `baselines/${siteHash(domain)}/${slug}/${viewport}.png`;
+  saveBaseline(domain, slug, viewport, sourceFile, ownerId = 'operator') {
+    const dest = this.local.saveBaseline(domain, slug, viewport, sourceFile, ownerId);
+    const key = `baselines/${ownerSeg(ownerId)}/${siteHash(domain)}/${slug}/${viewport}.png`;
     this.put(key, fs.readFileSync(dest)).catch((e) => console.error('s3 baseline failed', e.message || e));
     return dest;
   }
@@ -77,9 +78,10 @@ export class S3Storage {
     this.deletePrefix(`runs/${runId}/`).catch((e) => console.error('s3 delete failed', e.message || e));
   }
 
-  deleteBaselineSite(hash) {
-    this.local.deleteBaselineSite(hash);
-    this.deletePrefix(`baselines/${hash}/`).catch((e) => console.error('s3 baseline delete failed', e.message || e));
+  deleteBaselineSite(ownerId, hash) {
+    this.local.deleteBaselineSite(ownerId, hash);
+    this.deletePrefix(`baselines/${ownerSeg(ownerId)}/${hash}/`)
+      .catch((e) => console.error('s3 baseline delete failed', e.message || e));
   }
 
   async deletePrefix(prefix) {

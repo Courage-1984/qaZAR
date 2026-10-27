@@ -4,6 +4,7 @@ import { cancelRun, enqueue } from '../queue/jobs.js';
 import { promoteRun } from '../visual/baseline.js';
 import { validateRunInput } from './validate.js';
 import { generateExecutiveReport } from '../report/reportGenerator.js';
+import { reviewFindings } from '../report/findingReview.js';
 import { assertInflight } from '../quota/enforce.js';
 import { storage } from '../storage/storageAdapter.js';
 import fs from 'node:fs';
@@ -52,6 +53,12 @@ runsRouter.get('/:id/report', async (req, res) => {
   }
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
+});
+
+runsRouter.get('/:id/review', async (req, res) => {
+  const run = await owned(req, req.params.id);
+  if (!run) return res.status(404).json({ error: 'Not found' });
+  res.json(reviewFindings(run, run.reviewOverrides || {}));
 });
 
 runsRouter.get('/:id/report.pdf', async (req, res) => {

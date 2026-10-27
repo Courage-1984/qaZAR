@@ -12,6 +12,7 @@
  * - media-bleed
  * - element-collision
  * - nav-collapse (touch/mobile/tablet viewports)
+ * - menu-toggle-keyboard / menu-toggle-name (touch/narrow viewports)
  */
 export function evaluate({ touch, viewportWidth }) {
   const MAX_PER_RULE = 50;
@@ -366,6 +367,17 @@ export function evaluate({ touch, viewportWidth }) {
             : `Navigation shows ${links.length} horizontal links across ${Math.round(navRect.width)}px on viewport ${viewportWidth}px and no menu toggle was found inside this nav`
         );
       }
+    }
+  }
+
+  // --- 8. Menu toggle keyboard affordance (narrow / touch) ---
+  if (touch || viewportWidth <= 768) {
+    for (const el of document.querySelectorAll('button[aria-expanded], button[aria-controls], .hamburger, .nav-toggle, .navbar-toggler, [role="button"][aria-expanded]')) {
+      if (!visible(el)) continue;
+      const name = (el.getAttribute('aria-label') || el.textContent || '').trim();
+      const operable = (el.tagName === 'BUTTON' || el.tagName === 'A' || el.getAttribute('role') === 'button') && el.tabIndex !== -1;
+      if (!operable) add('menu-toggle-keyboard', 'warn', el, 'Menu toggle is not keyboard-operable (use a focusable button/link)');
+      else if (!name) add('menu-toggle-name', 'warn', el, 'Menu toggle has no accessible name (aria-label or visible text)');
     }
   }
 

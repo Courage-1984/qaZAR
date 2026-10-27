@@ -1,4 +1,5 @@
 import { getBrowser } from '../engine/capturePage.js';
+import { installNavGuard } from '../engine/navGuard.js';
 import { normalizeUrl, isAssetUrl, sameOrigin } from './normalize.js';
 import { assertPublicUrl } from '../routes/validate.js';
 
@@ -17,13 +18,10 @@ export async function extractLinksHeadless(url, timeoutMs = 20000) {
 
   const links = new Set();
   try {
-    await context.route('**/*', async (route) => {
+    await installNavGuard(context);
+    await context.route('**/*', (route) => {
       const type = route.request().resourceType();
       if (type === 'image' || type === 'media' || type === 'font') return route.abort();
-      if (type === 'document') {
-        try { await assertPublicUrl(route.request().url(), 'nav'); }
-        catch { return route.abort('blockedbyclient'); }
-      }
       return route.continue();
     });
     const page = await context.newPage();

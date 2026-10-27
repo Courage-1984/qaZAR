@@ -6,6 +6,26 @@ import { config } from '../config.js';
 let db;
 let dbFile = '';
 
+function migrateBaselineMeta(database) {
+  const cols = database.prepare('PRAGMA table_info(baseline_meta)').all();
+  if (!cols.length) return;
+  const pk = cols.filter((c) => c.pk).map((c) => c.name);
+  if (pk.length === 1 && pk[0] === 'site_hash') {
+    database.exec(`
+      CREATE TABLE baseline_meta_new (
+        owner_id TEXT NOT NULL,
+        site_hash TEXT NOT NULL,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (owner_id, site_hash)
+      );
+      INSERT OR IGNORE INTO baseline_meta_new (owner_id, site_hash, updated_at)
+        SELECT owner_id, site_hash, updated_at FROM baseline_meta;
+      DROP TABLE baseline_meta;
+      ALTER TABLE baseline_meta_new RENAME TO baseline_meta;
+    `);
+  }
+}
+
 function schema(database) {
   database.exec(`
     PRAGMA journal_mode = WAL;
@@ -35,11 +55,13 @@ function schema(database) {
       stripe_customer_id TEXT
     );
     CREATE TABLE IF NOT EXISTS baseline_meta (
-      site_hash TEXT PRIMARY KEY,
       owner_id TEXT NOT NULL,
-      updated_at INTEGER NOT NULL
+      site_hash TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (owner_id, site_hash)
     );
   `);
+  migrateBaselineMeta(database);
 }
 
 export function dbPath() {
@@ -109,17 +131,17 @@ export function setTierByCustomer(customerId, tier) {
 
 export function touchBaseline(siteHash, ownerId, now = Date.now()) {
   getDb().prepare(`
-    INSERT INTO baseline_meta (site_hash, owner_id, updated_at) VALUES (?, ?, ?)
-    ON CONFLICT(site_hash) DO UPDATE SET owner_id = excluded.owner_id, updated_at = excluded.updated_at
-  `).run(siteHash, ownerId, now);
+    INSERT INTO baseline_meta (owner_id, site_hash, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(owner_id, site_hash) DO UPDATE SET updated_at = excluded.updated_at
+  `).run(ownerId, siteHash, now);
 }
 
 export function listBaselineMeta() {
-  return getDb().prepare('SELECT site_hash, owner_id, updated_at FROM baseline_meta').all();
+  return getDb().prepare('SELECT owner_id, site_hash, updated_at FROM baseline_meta').all();
 }
 
-export function deleteBaselineMeta(siteHash) {
-  getDb().prepare('DELETE FROM baseline_meta WHERE site_hash = ?').run(siteHash);
+export function deleteBaselineMeta(ownerId, siteHash) {
+  getDb().prepare('DELETE FROM baseline_meta WHERE owner_id = ? AND site_hash = ?').run(ownerId, siteHash);
 }
 
 export function countActiveRuns() {

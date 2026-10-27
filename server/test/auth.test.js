@@ -84,6 +84,7 @@ test('share payload hides contacts and another owner cannot read artefacts', asy
   run.summary = { changed: 0 };
   await save(run);
   storage.writeArtifact(run.id, 'shots/home/desktop.png', 'png');
+  storage.writeArtifact(run.id, 'run.json', JSON.stringify(run));
   const share = await fetch(`${base}/api/share/${run.shareToken}`).then((r) => r.json());
   assert.equal(share.status, 'done');
   assert.equal(JSON.stringify(share).includes('hidden@example.com'), false);
@@ -94,6 +95,8 @@ test('share payload hides contacts and another owner cannot read artefacts', asy
   assert.equal(denied.status, 404);
   const open = await fetch(`${base}/api/artifacts/${run.id}/shots/home/desktop.png`);
   assert.equal(open.status, 200);
+  const secret = await fetch(`${base}/api/artifacts/${run.id}/run.json`);
+  assert.equal(secret.status, 404);
 });
 
 test('GitHub Pages can create a run without a key', async () => {

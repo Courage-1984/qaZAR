@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { getByShareToken } from '../storage/runStore.js';
 import { storage } from '../storage/storageAdapter.js';
 import { calculateHealthScore } from '../report/scoreCalculator.js';
+import { reviewFindings } from '../report/findingReview.js';
 
 const missing = { error: 'Not found' };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -27,6 +28,7 @@ shareRouter.get('/:token', async (req, res) => {
   const run = await runFor(req.params.token);
   if (!run) return res.status(404).json(missing);
   const scored = run.status === 'done' ? calculateHealthScore(run) : null;
+  const review = run.status === 'done' ? reviewFindings(run).counts : null;
   const hasPdf = storage.hasArtifact?.(run.id, 'report.pdf')
     || fs.existsSync(storage.getArtifactPath(run.id, 'report.pdf'));
   res.json({
@@ -35,6 +37,7 @@ shareRouter.get('/:token', async (req, res) => {
     domain: run.input?.domain || '',
     coverage: scored?.metrics?.coverageLine || null,
     score: scored?.score ?? null,
+    review,
     hasPdf: Boolean(hasPdf),
     finishedAt: run.finishedAt || null,
     error: run.status === 'failed' ? (run.error || 'failed') : null,

@@ -41,6 +41,7 @@ The engine injects evaluations into the DOM on every viewport and flags:
 - **Overlaps**: A possible overlap. It is described as covering a control only when the overlap includes the centre of a link or button.
 - **Media bleed**: An image that escapes the page fails. A box clipped by an ancestor with overflow other than visible passes.
 - **Navigation**: A hamburger elsewhere in the document does not prove the menu collapsed.
+- **Menu toggles**: On narrow/touch viewports, toggles must be keyboard-operable and named (`menu-toggle-keyboard`, `menu-toggle-name`).
 
 ## Visual Regression Engine
 

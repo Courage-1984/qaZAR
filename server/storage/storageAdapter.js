@@ -2,13 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { runsDir, baselinesDir } from '../config.js';
 import { S3Storage } from './s3Storage.js';
+import { ownerSeg, siteHash } from './paths.js';
 
-export function siteHash(domain) {
-  return String(domain || '').replace(/https?:\/\//, '').replace(/[^a-zA-Z0-9.-]/g, '_');
-}
+export { ownerSeg, siteHash };
 
 /**
  * Storage adapter. Local disk by default. STORAGE_DRIVER=s3 selects S3 or R2.
+ * Baselines live under baselines/<owner>/<siteHash>/…
  */
 class LocalFileStorageAdapter {
   driver = 'local';
@@ -47,28 +47,26 @@ class LocalFileStorageAdapter {
 
   deleteRunArtifacts(runId) {
     const dir = this.getRunDir(runId);
-    if (fs.existsSync(dir)) {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+    if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
   }
 
-  getBaselinePath(domain, slug, viewport) {
-    return path.join(this.baselinesRoot, siteHash(domain), slug, `${viewport}.png`);
+  getBaselinePath(domain, slug, viewport, ownerId = 'operator') {
+    return path.join(this.baselinesRoot, ownerSeg(ownerId), siteHash(domain), slug, `${viewport}.png`);
   }
 
   mirrorArtifact() {}
 
-  deleteBaselineSite(hash) {
-    const dir = path.join(this.baselinesRoot, hash);
+  deleteBaselineSite(ownerId, hash) {
+    const dir = path.join(this.baselinesRoot, ownerSeg(ownerId), hash);
     if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
   }
 
-  hasBaseline(domain, slug, viewport) {
-    return fs.existsSync(this.getBaselinePath(domain, slug, viewport));
+  hasBaseline(domain, slug, viewport, ownerId = 'operator') {
+    return fs.existsSync(this.getBaselinePath(domain, slug, viewport, ownerId));
   }
 
-  saveBaseline(domain, slug, viewport, sourceFile) {
-    const dest = this.getBaselinePath(domain, slug, viewport);
+  saveBaseline(domain, slug, viewport, sourceFile, ownerId = 'operator') {
+    const dest = this.getBaselinePath(domain, slug, viewport, ownerId);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(sourceFile, dest);
     return dest;
