@@ -69,6 +69,10 @@ test('body ownerId is ignored and a public key cannot widen the crawl', async ()
   assert.equal(run.input.max_pages, 5);
   assert.equal(run.input.renderJs, false);
   assert.equal(run.input.pages, null);
+  const { getRun, save } = await import('../storage/runStore.js');
+  const stored = getRun(res.json.runId);
+  stored.status = 'done';
+  save(stored);
 });
 
 test('share payload hides contacts and another owner cannot read artefacts', async () => {

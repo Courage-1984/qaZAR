@@ -52,7 +52,7 @@ function prospectEmail(raw) {
   return email;
 }
 
-export async function validateRunInput(body = {}, { publicCaller = false } = {}) {
+export async function validateRunInput(body = {}, { publicCaller = false, pageCap = null } = {}) {
   const domain = await assertPublicUrl(String(body.domain || '').trim(), 'domain');
   let sitemap_url = publicCaller ? '' : String(body.sitemap_url || '').trim();
   if (sitemap_url) sitemap_url = await assertPublicUrl(sitemap_url, 'sitemap_url');
@@ -61,7 +61,7 @@ export async function validateRunInput(body = {}, { publicCaller = false } = {})
   const listed = publicCaller ? [] : resolveExplicitPages(domain, body.pages);
   for (const page of listed) await assertPublicUrl(page, 'page');
   const pages = listed.length ? listed : null;
-  const cap = publicCaller ? config.publicMaxPages : config.maxPagesCap;
+  const cap = pageCap ?? (publicCaller ? config.publicMaxPages : config.maxPagesCap);
   return {
     domain,
     sitemap_url: pages ? null : sitemap_url || null,

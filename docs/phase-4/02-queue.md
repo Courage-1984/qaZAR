@@ -1,3 +1,5 @@
+Implemented. The live list is [TODOS.md](../../TODOS.md).
+
 # Pillar 2 — Durable queue and concurrency
 
 `server/queue/jobQueue.js` keeps one run on `let chain = Promise.resolve()`. `enqueue` appends `processRun`. A restart in `loadAll()` marks `queued`, `crawling`, and `capturing` as `failed`. That is not safe once a stranger can submit work.

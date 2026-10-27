@@ -1,10 +1,6 @@
-/** Search-appearance block for the executive report. All interpolated text is escaped. */
+import { esc } from './esc.js';
 
-function esc(s) {
-  return String(s ?? '').replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  })[c]);
-}
+/** Search-appearance block for the executive report. All interpolated text is escaped. */
 
 function pathOf(url) {
   try {

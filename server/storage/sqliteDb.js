@@ -29,6 +29,16 @@ function schema(database) {
       last_error TEXT,
       worker_id TEXT
     );
+    CREATE TABLE IF NOT EXISTS owners (
+      owner_id TEXT PRIMARY KEY,
+      tier TEXT NOT NULL DEFAULT 'free',
+      stripe_customer_id TEXT
+    );
+    CREATE TABLE IF NOT EXISTS baseline_meta (
+      site_hash TEXT PRIMARY KEY,
+      owner_id TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
 }
 
@@ -73,6 +83,48 @@ export function readByShare(token) {
 
 export function listRunPayloads() {
   return getDb().prepare('SELECT payload FROM runs').all().map(parse);
+}
+
+export function countInflight(ownerId) {
+  const row = getDb().prepare(`SELECT COUNT(*) AS n FROM runs WHERE owner_id = ? AND status IN ('queued', 'crawling', 'capturing')`).get(ownerId);
+  return row?.n || 0;
+}
+
+export function getTier(ownerId) {
+  const row = getDb().prepare('SELECT tier FROM owners WHERE owner_id = ?').get(ownerId);
+  return row?.tier || 'free';
+}
+
+export function setTier(ownerId, tier, stripeCustomerId = null) {
+  getDb().prepare(`
+    INSERT INTO owners (owner_id, tier, stripe_customer_id) VALUES (?, ?, ?)
+    ON CONFLICT(owner_id) DO UPDATE SET tier = excluded.tier,
+      stripe_customer_id = COALESCE(excluded.stripe_customer_id, owners.stripe_customer_id)
+  `).run(ownerId, tier, stripeCustomerId);
+}
+
+export function setTierByCustomer(customerId, tier) {
+  getDb().prepare('UPDATE owners SET tier = ? WHERE stripe_customer_id = ?').run(tier, customerId);
+}
+
+export function touchBaseline(siteHash, ownerId, now = Date.now()) {
+  getDb().prepare(`
+    INSERT INTO baseline_meta (site_hash, owner_id, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(site_hash) DO UPDATE SET owner_id = excluded.owner_id, updated_at = excluded.updated_at
+  `).run(siteHash, ownerId, now);
+}
+
+export function listBaselineMeta() {
+  return getDb().prepare('SELECT site_hash, owner_id, updated_at FROM baseline_meta').all();
+}
+
+export function deleteBaselineMeta(siteHash) {
+  getDb().prepare('DELETE FROM baseline_meta WHERE site_hash = ?').run(siteHash);
+}
+
+export function countActiveRuns() {
+  const row = getDb().prepare(`SELECT COUNT(*) AS n FROM runs WHERE status IN ('queued', 'crawling', 'capturing')`).get();
+  return row?.n || 0;
 }
 
 export function deleteRunRow(id) {

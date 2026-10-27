@@ -14,7 +14,7 @@ export const config = {
   navTimeoutMs: 45000,
   maxPagesCap: 200,
   publicMaxPages: Number(process.env.PUBLIC_MAX_PAGES || 5),
-  hostGapSec: Number(process.env.HOST_GAP_SEC || 1),
+  hostGapSec: Number(process.env.HOST_GAP_SEC || 0),
   hostGapCapSec: Number(process.env.HOST_GAP_CAP_SEC || 10),
   hostInflight: Number(process.env.HOST_INFLIGHT || 2),
   allowedOrigins: String(process.env.QAZAR_ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean),

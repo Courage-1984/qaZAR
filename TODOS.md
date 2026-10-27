@@ -1,182 +1,37 @@
-# qaZAR – Project Roadmap & TODOs
+# qaZAR TODOs
 
-This file tracks active engineering tasks and milestones across the qaZAR development lifecycle.
+Live list. Phases 1 and 2 (viewport engine, heuristics, crawler, HTML report, GitHub Pages, tunnel) are done. Detail lives in `docs/`.
 
----
+## Done
 
-## Phase 1: Core Engine & Heuristics (Completed)
-- [x] Multi-viewport capture engine (7 exact viewports: ultrawide, fhd, macbook, desktop, laptop, tablet, mobile).
-- [x] DOM heuristic checks (`server/heuristics/evaluate.js`):
-  - [x] Responsive breakage & horizontal overflow (`overflow-x`).
-  - [x] Touch target minimums (>= 48x48px on mobile/tablet).
-  - [x] Typography scaling (minimum body size, heading hierarchy).
-  - [x] WCAG AA contrast ratio calculation (luminance + alpha compositing).
-  - [x] Media bleed & unconstrained media containers.
-  - [x] Layout collisions and element overlap detection.
-  - [x] Responsive navigation collapse checks.
-- [x] Visual regression suite with `pixelmatch` diff generation.
-- [x] First-run automatic baseline seeding & manual promotion (`POST /api/runs/:id/baseline`).
-- [x] Static Vite UI (vanilla JS/CSS) with 3-way visual inspector (baseline / diff / current).
-- [x] Initial crawler (sitemap XML parser & BFS crawler with SSRF guard).
-- [x] Shared safety hooks and agentic governance (`AGENTS.md`, `.agents/`).
+- [x] Seven viewports, self-contained `evaluate()`, SSRF guard, visual diffs.
+- [x] SQLite run store (`SqliteRunStore`) and a leased worker (`npm run worker`).
+- [x] Partner API keys. GitHub Pages still calls the tunnel with no key.
+- [x] Share link `GET /api/share/:token` and A4 PDF (`server/report/pdfReport.js`).
+- [x] Crawl-delay on discovery fetches. Public keys capped at `PUBLIC_MAX_PAGES`.
+- [x] Logi-Ink `#auditUrl` and `workers/audit-proxy` (separate repo).
 
----
+## Phase 3 (this release)
 
-## Phase 2: MVP Completion & Production Readiness (Completed / Active)
+- [x] Free vs pro quotas. Pages and `ownerId` `operator` are not capped. Free keys: 5 pages, 1 in-flight run, baselines 14 days. Pro: 50 pages, 3 in-flight runs, baselines 365 days.
+- [x] S3-compatible artifacts (`STORAGE_DRIVER=s3`, Cloudflare R2 via `S3_ENDPOINT`). Local disk stays the default.
+- [x] Stripe Checkout and webhook. `checkout.session.completed` sets pro. `customer.subscription.deleted` sets free.
 
-### 1. Local HTML Fixtures & Automated Heuristic Tests (Completed)
-- [x] Created synthetic test fixture HTML files under `server/test/fixtures/` (`clean.html`, `overflow.html`, `touch.html`, `contrast.html`).
-- [x] Added Playwright-backed test suite (`server/test/heuristics.test.js`) validating `evaluate()` runtime closures against live headless Chromium contexts.
+## Speed
 
-### 2. Real-Time UI Progress (SSE) (Completed)
-- [x] Implemented Server-Sent Events endpoint `GET /api/runs/:id/events` with heartbeat ping keep-alives and proxy compatibility headers.
-- [x] Upgraded `web/results.js` to connect to `EventSource` for live per-viewport progress and violation updates with polling fallback.
+- Baseline, one page of example.com, 7 viewports: discovery 52 ms, capture 6358 ms. Every viewport spent about 500 ms in network idle. Fonts were 0–2 ms.
+- After dropping network idle: discovery 54 ms, capture 2574 ms. Idle was 0 ms on every viewport. The second navigation was warm, so part of the drop is cache, and the measured idle wait is gone.
 
-### 3. Smart Crawler & ROI Prioritization (Completed)
-- [x] Created ROI Page Scorer (`server/crawler/roiScorer.js`) prioritizing commercial & core UX templates over pagination/duplicate content.
-- [x] Added Headless JS Crawl fallback (`server/crawler/headlessCrawl.js`) for Single Page Applications (SPAs).
+## Later (not this release)
 
-### 4. Storage & Database Abstraction (Completed)
-- [x] Created `storageAdapter.js` abstracting run artifacts, diffs, and baselines for local filesystem and future S3/R2.
-- [x] Created `databaseAdapter.js` supporting multi-tenant `ownerId` and SSE broadcasting.
-- [x] Consolidated storage layer in `server/storage/runStore.js`.
+- [ ] Precision and recall on live Logia and Logi-Ink runs, with retained, withdrawn, and needs-review findings. No replacement score.
+- [ ] Screenshot-pixel contrast, full keyboard menu tests, and a maintained accessibility engine.
+- [ ] Block private-IP subresources inside the captured page.
 
-### 5. Docker Containerization & Health (Completed)
-- [x] Production `Dockerfile` with Node 20 base + Playwright headless Chromium dependencies.
-- [x] `docker-compose.yml` pre-configuring `shm_size: '1gb'` and persistent volume mapping.
-- [x] Healthcheck endpoints `GET /healthz` and `GET /api/health` with memory, uptime, and queue metrics.
+## Phase 5 (not started)
 
-### 6. Live VPS Deployment & Documentation (Completed)
-- [x] Added deployment guide (`docs/deployment.md`) with Caddy and Nginx reverse proxy configurations with automatic SSL.
-- [x] Modular documentation suite under `docs/` (`architecture.md`, `crawler-roi.md`, `api.md`, `deployment.md`).
+- [ ] Logi-Ink account screen for Checkout and the current tier.
+- [ ] Postgres driver beside SQLite.
+- [ ] More than one capture worker.
 
-### 7. False-Positive Tuning & Heuristic Robustness (Completed)
-- [x] Flag contrast over background images, linear gradients, or video backgrounds as `wcag-contrast-indeterminate` with `severity: 'info'`.
-- [x] Expanded collision detection sampling to top 60 interactive/content elements with viewport-intersection filtering.
-- [x] Refined `nav-collapse` selector heuristics with bypass for scrollable chip/tag carousels.
-- [x] Expanded cross-viewport scaling heuristics covering H1 and H2 scale down checks + mobile undersized warnings.
-
-### 8. Crawl Intelligence, Cheap ROI State & Hot Lead Capture (Completed)
-- [x] Zero-overhead page profiling during crawl (`server/crawler/siteProfiler.js`): TTFB response time, HTML byte size, viewport meta detection, tech stack fingerprinting (WordPress, Shopify, Webflow, Next.js, React, Nuxt, jQuery, GTM, Meta Pixel).
-- [x] Non-invasive lead contact scraping: public email, phone, and social profile discovery.
-- [x] Executive UX/UI Audit Report HTML generator (`server/report/reportGenerator.js`): standalone, print-ready, high-trust 0-100 score + letter grade with remediation quote lead capture CTA.
-- [x] Integrated Crawl & Lead Intelligence badge strip in `web/results.js` (latency, tech stack, mobile viewport check, lead email).
-- [x] Unit test suite for site profiler and lead signal aggregation in `server/test/unit.test.js`.
-
-### 9. Crawler & Report Iteration with MVP Progress Markers (Completed)
-- [x] Granular crawl progress markers streamed over SSE (`crawling:sitemap`, `crawling:bfs`, `crawling:profiling`, `crawling:prioritizing`).
-- [x] Expose ROI score breakdown and commercial weight factors in UI run view (page tags e.g. `pricing · 95pts`).
-- [x] HTML executive report with a customizable agency email (`?email=`). The JSON summary export was removed.
-- [x] Automatic stale process detection and auto-termination on port 8787 upon server start (`server/freePort.js`).
-
-### 10. High-ROI Report Intelligence & Noise Elimination (Completed)
-- [x] Cross-viewport defect clustering (`server/report/scoreCalculator.js`) to eliminate repetition, duplicate noise, and report inflation.
-- [x] Zero-overhead transport security (HTTPS, HSTS, CSP) and asset compression (Gzip/Brotli) profiling (`server/crawler/siteProfiler.js`).
-- [x] Engineering Remediation vs. Rebuild ROI Calculator (`estimateRemediationRoi`) in executive reports and lead capture emails.
-
-### 11. Conversion Funnel Integrity & Print-Ready Export (Completed)
-- [x] Conversion funnel classification (`siteProfiler.js`): tracks pricing, checkout, auth, and contact coverage.
-- [x] Zero-cost broken link detection during BFS and sitemap discovery.
-- [x] Print & PDF export engine in `reportGenerator.js` with page-break protection and one-click print button.
-
-### 12. Anti-Inflation Calibration & Authentic Reporting (Completed)
-- [x] Selector normalization in `clusterDefects`: collapses sibling elements (e.g. repeated navigation/footer items) into a single component finding to prevent artificial defect multiplication.
-- [x] Scope-calibrated dev effort estimator: realistically scales hours based on actual site page count and clean architecture (e.g. 1-page sites with minor issues receive 1-2h polish, not 8h-15h inflation).
-- [x] Suppressed 0-count risk items in executive reports: non-existent liabilities are replaced with positive structural health confirmations.
-
-### 13. Asset Bloat & Commercial Intent Profiling (Completed)
-- [x] Zero-overhead render-blocking script, web font, and unlazy image detection (`siteProfiler.js`).
-- [x] Commercial form intent & insecure HTTP post detection (`siteProfiler.js`).
-- [x] Enriched asset hygiene and lead conversion cards in executive reports and UI results.
-
-### 14. Actionable 3-Tier Remediation Roadmap (Completed)
-- [x] Prioritized implementation roadmap generator (`scoreCalculator.js`): Tier 1 Quick Wins (<1h), Tier 2 UX & Accessibility, Tier 3 Strategic Architecture.
-- [x] Native visual rendering in executive audit reports and print/PDF views (`reportGenerator.js`).
-
-### 15. Cross-Viewport Breakpoint Inversion & Tablet Comparison (Completed)
-- [x] Multi-viewport breakpoint inversion detection (`heading-scale-inverted`) across desktop, tablet, and mobile (`jobQueue.js`).
-- [x] Unit test suite for cross-viewport scaling and style inversion in `server/test/unit.test.js`.
-
-### 16. Interactive Page Matrix Filtering & Search (Completed)
-- [x] Multi-state matrix filtering chips (`ALL`, `ERROR`, `WARN`, `CHANGED`) and live URL search input (`web/results.js`).
-- [x] Client-side row filtering with real-time match counters.
-
-### 17. Social OpenGraph & Canonical Link Previews (Completed)
-- [x] Verified OpenGraph image/title and canonical URL presence (`siteProfiler.js`).
-- [x] Social preview readiness card in executive report and actionable roadmap quick-win triggers.
-
-### 18. Polite Robots.txt Enforcement & Crawl-Delay (Completed)
-- [x] Polite crawler compliance: respects robots.txt `Disallow` rules across BFS and sitemaps (`crawl.js`).
-- [x] Parsed `Crawl-delay` and sitemap declarations (`robots.js`).
-
-### 19. One-Click Executive Summary Clipboard Export (Completed)
-- [x] Pre-formatted Markdown executive summary generator for Jira/Slack sharing (`reportGenerator.js`).
-- [x] Interactive copy button with instant browser clipboard integration.
-
-### 20. Real-Time Stream State Indicator & SSE Connection Badge (Completed)
-- [x] Live SSE connection status badge (`🟢 Live SSE`, `🟡 Polling`, `✓ Complete`) in results header (`web/results.js`).
-- [x] Stream state tracking across EventSource lifecycle and automatic fallback polling.
-
-### 21. Report API Specifications & Multi-Format Documentation (Completed)
-- [x] Report query parameters documented in `docs/api.md`. The JSON report format was removed.
-- [x] Documented lead capture customization (`?email=`) and automated download parameters (`?download=1`).
-
-### 22. Verified Domain Ownership & Lead Contact Dossier (Completed)
-- [x] Scraped and verified domain ownership contacts (public emails, phones, social links) displayed in executive reports (`reportGenerator.js`).
-- [x] Modularized report CSS styles into dedicated `reportStyles.js` to preserve strict file size caps (<250 lines).
-
-### 23. Code Hygiene & Accessibility Debt Profiling (Completed)
-- [x] Detected deprecated HTML legacy tags (`<center>`, `<font>`, `<marquee>`) and missing image `alt` descriptions during crawl (`siteProfiler.js`).
-- [x] Incorporated code hygiene indicators and favicon checks into remediation roadmap and rebuild ROI scoring (`scoreCalculator.js`, `reportGenerator.js`).
-
-### 24. Agency Whitelabeling & Custom Advisory Branding (Completed)
-- [x] Configurable agency brand name and advisory styling (`?agency=`) across executive audit header, footer, and lead CTA (`reportGenerator.js`, `routes/runs.js`).
-- [x] Updated client web API helper to support structured report query parameters (`web/api.js`).
-
-### 25. Bounding Box Violation Inspection & Report URL Query Fix (Completed)
-- [x] Inlined element bounding box coordinates (`w×h @ (x,y)`) into detail violation rows for rapid layout debug (`web/results.js`).
-- [x] Fixed structured query parameter formatting for JSON executive report exports (`web/results.js`).
-
-### 26. Crawl Metadata & Search Engine Compliance Profiling (Completed)
-- [x] Captured robots.txt and sitemap discovery status in `crawlMeta` during crawl queue initialization (`crawl.js`).
-- [x] Surfaced search crawler compliance in executive reports and auto-triggered quick-win remediation steps (`scoreCalculator.js`, `reportGenerator.js`).
-
-### 27. Live Advisory Branding Toolbar & UI View Modularization (Completed)
-- [x] In-app persistent advisory branding input toolbar in UI results header for on-the-fly report whitelabeling (`web/results.js`).
-- [x] Modularized cell view and capture inspection logic into dedicated `web/cellView.js` to preserve strict file size caps (<250 lines).
-
-### 28. Mobile & LAN Network Accessibility (Completed)
-- [x] Bound Express server to `0.0.0.0` (configurable via `HOST`) and logged LAN IP for direct mobile device access (`config.js`, `index.js`).
-- [x] Updated client `getApiBase()` to dynamically infer mobile/LAN hostnames and support query string `?api=` configuration (`web/api.js`, `web/submit.js`).
-
-### 29. Public HTTPS Cloudflare Tunnel & Mobile GitHub Pages Detection (Completed)
-- [x] Served static web UI directly from API server (`web/dist` or `web/`) so direct mobile/LAN/tunnel URLs serve the complete client (`index.js`).
-- [x] Automated Cloudflare HTTPS Quick Tunnel (`npm run server:tunnel`, `server/tunnel.js`) to provide secure public access outside the local network.
-- [x] Excluded GitHub Pages hostnames from port 8787 guessing and added mixed content error prevention in web client (`web/api.js`, `web/submit.js`).
-
-### 30. Zero-Config Mobile & Outside Network Auto-Discovery (Completed)
-- [x] Auto-publishing live tunnel and LAN discovery metadata to GitHub Gist on server launch (`server/tunnel.js`, `server/index.js`).
-- [x] Auto-detection and auto-retry on GitHub Pages (`autoDiscoverApi()` in `web/api.js`), allowing instant connectivity from mobile phones and outside networks without manual URL typing.
-- [x] In-app auto-detect retry action in results fail state and visual feedback in submission page (`web/submit.js`, `web/results.js`).
-- [x] Default tunnel activation on `npm run server` when `cloudflared` is detected (`server/config.js`).
-
----
-
-## Phase 3: Tail End – Auth, Multi-Tenancy & Monetisation (Post-MVP)
-
-### 1. Authentication & Tenant Isolation
-- [ ] User authentication (session tokens / API keys).
-- [ ] Enforce tenant boundaries using the built-in `ownerId` in `server/storage/databaseAdapter.js`.
-- [ ] Strict tenant isolation: users can only inspect or delete their own runs.
-
-### 2. Cloud Storage Migration
-- [ ] Add S3/Cloudflare R2 driver to `server/storage/storageAdapter.js`.
-- [ ] Add SQLite / PostgreSQL driver to `server/storage/databaseAdapter.js`.
-
-### 3. Public Sharing & Reporting
-- [ ] Shareable report permalinks: unguessable public tokens granting read-only access to a specific run report.
-- [ ] Exportable PDF / summary reports for client handoff.
-
-### 4. Monetisation & Usage Quotas
-- [ ] Free vs. Pro tier enforcement (page limits, concurrent runs, baseline retention).
-- [ ] Stripe / LemonSqueezy billing integration.
+Phase 4’s old checklist is [TODOS-PHASE-4.md](TODOS-PHASE-4.md). It points here.

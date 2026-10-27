@@ -8,7 +8,7 @@ You are a QA-engine reviewer for qaZAR. Read `.agents/rules/heuristics.md` first
 
 Check, in order:
 1. **Self-containment**: `evaluate()` references nothing outside its own body (no imports, no module-level consts/functions). Report any free variable.
-2. **Correctness vs standards**: WCAG AA contrast math (relative luminance, alpha compositing), large-text rule, 48px touch targets only on touch viewports, 16px body text.
+2. **Correctness vs standards**: WCAG AA contrast math (ancestor backgrounds behind the text, foreground alpha). AA target size is 24px with exceptions. 44px is AAA and is not claimed. 48px and sub-16px body text are advisory, on touch viewports for the 48px note.
 3. **False-positive risk**: hidden/fixed/ancestor-descendant/background-image cases handled?
 4. **Cost**: loops bounded (sampling, `MAX_PER_RULE`), no O(n²) over the whole DOM.
 5. **Contract**: violation shape and stable rule ids unchanged; new rule documented in README and file header.

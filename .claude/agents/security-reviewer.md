@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: Reviews API, crawler, storage and deployment changes for SSRF, abuse, secret leakage and multi-tenant readiness. Use proactively before pushing changes under server/routes, server/crawler, server/store or any auth/payment work.
+description: Reviews API, crawler, storage and deployment changes for SSRF, abuse, secret leakage and multi-tenant readiness. Use proactively before pushing changes under server/routes, server/crawler, server/storage or any auth/payment work.
 tools: Read, Grep, Glob
 ---
 

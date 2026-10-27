@@ -1,69 +1,19 @@
 
-import fs from 'node:fs';
-import path from 'node:path';
 import { config } from '../config.js';
 import { buildQueue } from '../crawler/crawl.js';
 import { slugFor } from '../crawler/normalize.js';
 import { scoreUrl } from '../crawler/roiScorer.js';
-import { capturePage, VIEWPORTS } from '../engine/capturePage.js';
-import { absorbRendered } from '../crawler/absorb.js';
-import { baselinePath, hasBaseline, promote } from '../visual/baseline.js';
-import { diffImages } from '../visual/diff.js';
-import { getRun, runPath, save } from '../storage/runStore.js';
+import { VIEWPORTS } from '../engine/capturePage.js';
+import { getRun, save } from '../storage/runStore.js';
 import { mapPool } from '../util/batch.js';
 import { finishRun } from './finishRun.js';
+import { evaluateCrossViewport, processViewport } from './viewportWork.js';
+
+export { evaluateCrossViewport };
 
 function stopped(runId) {
   const current = getRun(runId);
   return !current || current.status === 'cancelled';
-}
-
-async function processViewport(run, page, vp) {
-  const dir = runPath(run.id);
-  const rel = path.join('shots', page.slug, `${vp.name}.png`);
-  const abs = path.join(dir, rel);
-  const rec = { status: 'pending', shot: null, base: null, diff: null, diffPercent: null, violations: [], metrics: null, error: null };
-  page.viewports[vp.name] = rec;
-  try {
-    let lastErr;
-    let res;
-    for (let attempt = 0; attempt < 2 && !res; attempt++) {
-      try {
-        res = await capturePage(page.url, vp, abs, { collectLeads: vp.name === 'desktop' });
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-    if (!res) throw lastErr;
-    if (res.leadHtml && run.siteProfile) {
-      absorbRendered(run.siteProfile, res.leadHtml, page.url);
-      delete res.leadHtml;
-    }
-    rec.shot = rel.replaceAll('\\', '/');
-    rec.violations = res.violations;
-    rec.metrics = res.metrics;
-
-    const domain = run.input.domain;
-    if (!hasBaseline(domain, page.slug, vp.name)) {
-      promote(domain, page.slug, vp.name, abs); // auto-promote first capture
-      rec.status = 'new';
-    } else {
-      const baseRel = path.join('base', page.slug, `${vp.name}.png`);
-      const diffRel = path.join('diffs', page.slug, `${vp.name}.png`);
-      fs.mkdirSync(path.dirname(path.join(dir, baseRel)), { recursive: true });
-      fs.mkdirSync(path.dirname(path.join(dir, diffRel)), { recursive: true });
-      fs.copyFileSync(baselinePath(domain, page.slug, vp.name), path.join(dir, baseRel));
-      const d = diffImages(path.join(dir, baseRel), abs, path.join(dir, diffRel));
-      rec.base = baseRel.replaceAll('\\', '/');
-      rec.diff = diffRel.replaceAll('\\', '/');
-      rec.diffPercent = Number(d.diffPercent.toFixed(4));
-      rec.sizeChanged = d.sizeChanged;
-      rec.status = d.diffPercent >= config.diffThresholdPercent || d.sizeChanged ? 'changed' : 'unchanged';
-    }
-  } catch (e) {
-    rec.status = 'error';
-    rec.error = String(e.message || e).split('\n')[0];
-  }
 }
 
 function summarize(run) {
@@ -84,91 +34,53 @@ function summarize(run) {
   return s;
 }
 
-export function evaluateCrossViewport(page) {
-  const deskRec = page.viewports['desktop'] || page.viewports['fhd'] || page.viewports['ultrawide'];
-  const mobRec = page.viewports['mobile'];
-  const tabRec = page.viewports['tablet'];
-  if (!deskRec?.metrics) return;
-
-  const deskH1 = deskRec.metrics.headings?.h1;
-  const deskH2 = deskRec.metrics.headings?.h2;
-
-  if (tabRec?.metrics && deskH1) {
-    const tabH1 = tabRec.metrics.headings?.h1;
-    if (tabH1 && tabH1 > deskH1 + 4) {
-      tabRec.violations = tabRec.violations || [];
-      tabRec.violations.push({
-        rule: 'heading-scale-inverted',
-        severity: 'warn',
-        selector: 'h1',
-        rect: null,
-        detail: `Tablet H1 (${tabH1}px) exceeds desktop H1 (${deskH1}px) indicating breakpoint style inversion`,
-      });
-    }
-  }
-
-  if (mobRec?.metrics) {
-    const mobH1 = mobRec.metrics.headings?.h1;
-    const mobH2 = mobRec.metrics.headings?.h2;
-    const mobBody = mobRec.metrics.bodyFont || 16;
-
-    if (deskH1 && mobH1) {
-      if (mobH1 > deskH1 + 4) {
-        mobRec.violations.push({
-          rule: 'heading-scale-inverted',
-          severity: 'warn',
-          selector: 'h1',
-          rect: null,
-          detail: `Mobile H1 (${mobH1}px) exceeds desktop H1 (${deskH1}px) indicating breakpoint style inversion`,
-        });
-      } else if (deskH1 > 28 && mobH1 >= deskH1) {
-        mobRec.violations.push({
-          rule: 'heading-scale-static',
-          severity: 'warn',
-          selector: 'h1',
-          rect: null,
-          detail: `H1 size (${mobH1}px) does not scale down on mobile (390px) from desktop (${deskH1}px)`,
-        });
-      }
-      if (mobH1 <= mobBody) {
-        mobRec.violations.push({
-          rule: 'heading-scale-undersized',
-          severity: 'error',
-          selector: 'h1',
-          rect: null,
-          detail: `H1 size (${mobH1}px) is less than or equal to base body font (${mobBody}px) on mobile`,
-        });
-      }
-    }
-
-    if (deskH2 && mobH2 && deskH2 > 24 && mobH2 >= deskH2) {
-      mobRec.violations.push({
-        rule: 'heading-scale-static',
-        severity: 'warn',
-        selector: 'h2',
-        rect: null,
-        detail: `H2 size (${mobH2}px) does not scale down on mobile (390px) from desktop (${deskH2}px)`,
-      });
-    }
-  }
+function note(runId, stage, seen) {
+  if (!stage || stage === seen.current) return seen.current;
+  seen.current = stage;
+  console.log(`qaZAR worker ${runId} ${stage}`);
+  return stage;
 }
 
 export async function processRun(runId) {
   const run = getRun(runId);
   if (!run || run.status === 'cancelled') return;
+  const seen = { current: '' };
   try {
     run.status = 'crawling';
     run.crawlStage = 'sitemap';
     save(run);
+    note(runId, 'crawling', seen);
+    const crawlStarted = Date.now();
+    let crawlWrite = Promise.resolve();
+    let crawlLast = 0;
+    let crawlPending = null;
+    const saveCrawl = () => {
+      if (stopped(runId)) return;
+      const now = Date.now();
+      if (now - crawlLast < 400) {
+        if (!crawlPending) crawlPending = setTimeout(() => { crawlPending = null; saveCrawl(); }, 400 - (now - crawlLast));
+        return;
+      }
+      crawlLast = now;
+      crawlWrite = crawlWrite.then(() => {
+        if (!stopped(runId)) save(run);
+      }).catch((e) => console.error('save failed', e));
+    };
     const { urls, source, siteProfile } = await buildQueue({
       ...run.input,
       concurrency: run.input?.publicCaller ? 2 : config.crawlConcurrency,
       onProgress: (stage, message) => {
         run.crawlStage = stage;
         run.crawlMessage = message;
-        save(run);
+        saveCrawl();
+        note(runId, stage, seen);
       },
     });
+    if (crawlPending) clearTimeout(crawlPending);
+    await crawlWrite;
+    run.crawlMs = Date.now() - crawlStarted;
+    save(run);
+    const captureStarted = Date.now();
     if (!urls.length) throw new Error('No pages found (sitemap empty and crawl found nothing)');
     run.crawlSource = source;
     run.siteProfile = siteProfile || null;
@@ -184,6 +96,7 @@ export async function processRun(runId) {
     run.progress = { pagesDone: 0, pagesTotal: urls.length, capturesDone: 0, capturesTotal: urls.length * VIEWPORTS.length };
     run.status = 'capturing';
     save(run);
+    note(runId, 'capturing', seen);
 
     const tasks = run.pages.flatMap((page) => VIEWPORTS.map((vp) => ({ page, vp })));
     const remaining = new Map(run.pages.map((page) => [page, VIEWPORTS.length]));
@@ -218,13 +131,16 @@ export async function processRun(runId) {
     await writing;
 
     if (stopped(runId)) return;
+    run.captureMs = Date.now() - captureStarted;
     run.summary = summarize(run);
     run.status = 'done';
     run.finishedAt = new Date().toISOString();
     save(run);
+    note(runId, 'done', seen);
     await finishRun(run);
   } catch (e) {
     if (stopped(runId)) return;
+    note(runId, 'failed', seen);
     run.status = 'failed';
     run.error = String(e.message || e);
     run.finishedAt = new Date().toISOString();

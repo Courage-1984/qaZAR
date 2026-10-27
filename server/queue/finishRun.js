@@ -1,4 +1,4 @@
-import { generateExecutiveReport } from '../report/reportGenerator.js';
+import { generatePdfReport } from '../report/pdfReport.js';
 import { renderReportPdf } from '../report/renderPdf.js';
 import { sendReport } from '../mail/sendReport.js';
 import { storage } from '../storage/storageAdapter.js';
@@ -9,8 +9,9 @@ const BACKOFF = [60_000, 5 * 60_000, 15 * 60_000];
 
 async function ensurePdf(run) {
   if (storage.hasArtifact(run.id, 'report.pdf')) return;
-  const html = generateExecutiveReport(run, process.env.AGENCY_INBOX || 'consulting@qazar.dev');
-  await renderReportPdf(html, run.id);
+  const agency = process.env.AGENCY_INBOX || 'consulting@qazar.dev';
+  const html = generatePdfReport(run, agency);
+  await renderReportPdf(html, run.id, { agency, domain: run.input?.domain || '' });
 }
 
 /** Write the PDF and send mail. Mail failure enqueues a retry and does not recrawl. */

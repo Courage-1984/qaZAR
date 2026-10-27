@@ -1,3 +1,5 @@
+Implemented. The live list is [TODOS.md](../../TODOS.md).
+
 # Pillar 1 — Infrastructure and security
 
 Close the open API before any public form can call it. SSRF in `assertPublicUrl` stays as it is. Do not weaken it.

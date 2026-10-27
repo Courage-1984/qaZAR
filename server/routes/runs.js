@@ -4,6 +4,7 @@ import { cancelRun, enqueue } from '../queue/sqliteQueue.js';
 import { promoteRun } from '../visual/baseline.js';
 import { validateRunInput } from './validate.js';
 import { generateExecutiveReport } from '../report/reportGenerator.js';
+import { assertInflight } from '../quota/enforce.js';
 
 export const runsRouter = Router();
 
@@ -17,12 +18,16 @@ function owned(req, id) {
 
 runsRouter.post('/', async (req, res) => {
   try {
-    const input = await validateRunInput(req.body, { publicCaller: Boolean(req.auth?.publicCaller) });
+    const limits = assertInflight(req.auth);
+    const input = await validateRunInput(req.body, {
+      publicCaller: Boolean(req.auth?.publicCaller),
+      pageCap: limits.pageCap,
+    });
     const run = createRun(input, { ownerId: req.auth?.ownerId || 'operator' });
     enqueue(run.id, 'audit');
     res.status(202).json({ runId: run.id, shareToken: run.shareToken });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    res.status(e.status || 400).json({ error: e.message });
   }
 });
 

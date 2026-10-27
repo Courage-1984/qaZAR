@@ -21,12 +21,12 @@ graph TD
 ### 1. Viewport Isolation Engine (`server/engine/`)
 - Emulates exactly 7 immutable viewports (ultrawide, fhd, macbook, desktop, laptop, tablet, mobile).
 - Spawns a **fresh BrowserContext** for every single page x viewport capture.
-- Freezes CSS animations, transit transitions, carets, and sets deterministic date/random seeds.
+- Freezes CSS animations, transitions, and carets. A default audit does not replace `Date` or `Math.random`. `deterministic: true` does, and the report says so.
 
 ### 2. Self-Contained DOM Evaluator (`server/heuristics/evaluate.js`)
 - Injected directly into live pages via `page.evaluate()`.
 - Must remain 100% self-contained: no external imports, no outer-scope closures.
-- Evaluates horizontal overflow, touch target dimensions (>=48px), typography hierarchy, WCAG AA contrast (luminance + alpha compositing), media bleed, element collisions, and navigation collapse.
+- Evaluates overflow, WCAG 2.2 target size (24px with exceptions; 48px is advisory), typography, WCAG AA contrast, media bleed, possible overlaps, and navigation collapse.
 
 ### 3. Smart Crawler & ROI Scorer (`server/crawler/`)
 - Ingests sitemaps (standard XML and sitemap-indexes) or executes BFS.

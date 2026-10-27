@@ -1,3 +1,5 @@
+Implemented. The live list is [TODOS.md](../../TODOS.md).
+
 # Pillar 3 — Server-side PDF and email
 
 `generateExecutiveReport(run, leadEmail, options)` in `server/report/reportGenerator.js` returns HTML. `GET /api/runs/:id/report?email=` only changes the `mailto:` recipient. Nothing sends mail when a run finishes.

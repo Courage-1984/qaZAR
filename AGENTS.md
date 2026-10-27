@@ -11,7 +11,7 @@ Viewport UI/UX QA + visual regression suite. Node/Express API + Playwright worke
 
 ## Layout
 - `server/engine` Playwright capture + `viewports.js` · `server/crawler` sitemap/BFS · `server/heuristics/evaluate.js` DOM checks
-- `server/queue/jobQueue.js` run pipeline + cross-viewport checks · `server/visual` baseline + pixelmatch · `server/store` run persistence
+- `server/queue/jobQueue.js` run pipeline + cross-viewport checks · `server/visual` baseline + pixelmatch · `server/storage` run persistence
 - `server/routes` API + SSRF validation · `web/` UI (index = submit, results = list/detail via `?id=`)
 - `data/` runtime output (gitignored): `runs/<id>/`, `baselines/<siteHash>/<slug>/<viewport>.png`
 

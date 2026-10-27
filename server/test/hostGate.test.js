@@ -18,6 +18,21 @@ test('crawl-delay is waited and a huge delay is capped', async () => {
   assert.equal(Math.max(...capped), config.hostGapCapSec * 1000);
 });
 
+test('a zero crawl-delay does not sleep before the next fetch', async () => {
+  resetHostGate();
+  const slept = [];
+  const sleep = (ms) => { slept.push(ms); return Promise.resolve(); };
+  const origin = 'https://immediate.example';
+  const previous = config.hostGapSec;
+  config.hostGapSec = 0;
+  const first = await waitForHost(origin, 0, { sleep, now: () => 1_000 });
+  const second = await waitForHost(origin, 0, { sleep, now: () => 1_000 });
+  first();
+  second();
+  config.hostGapSec = previous;
+  assert.deepEqual(slept, []);
+});
+
 test('only two fetches run at once for one host', async () => {
   resetHostGate();
   const origin = 'https://lane.example';

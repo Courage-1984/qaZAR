@@ -21,6 +21,39 @@ export function absorbRendered(profile, html, url) {
     if (!profile.techStack.includes(name)) profile.techStack.push(name);
   }
   unionLeads(profile, signal.leads, url);
+  if (profile.codeHygiene?.measured !== true && signal.codeHygiene) {
+    profile.codeHygiene = {
+      legacyTagsTotal: signal.codeHygiene.legacyTags || 0,
+      missingAltImagesTotal: signal.codeHygiene.missingAltImages || 0,
+      hasFavicon: signal.codeHygiene.hasFavicon === true,
+      measured: true,
+    };
+  }
+  if (profile.assetHygiene?.measured !== true && signal.performance) {
+    profile.assetHygiene = {
+      uncompressedCount: null,
+      unlazyImagesTotal: signal.performance.unlazyImages || 0,
+      blockingScriptsTotal: signal.performance.renderBlockingScripts || 0,
+      webFontsTotal: signal.performance.webFonts || 0,
+      measured: true,
+    };
+  }
+  if (profile.socialSharing?.measured !== true) {
+    profile.socialSharing = {
+      hasOpenGraph: signal.hasOpenGraph === true,
+      hasCanonical: signal.hasCanonical === true,
+      openGraphPages: signal.hasOpenGraph ? 1 : 0,
+      canonicalPages: signal.hasCanonical ? 1 : 0,
+      pageCount: 1,
+      measured: true,
+    };
+  }
+  if (profile.hasMissingViewportMeta == null) profile.hasMissingViewportMeta = signal.hasViewportMeta === false;
+  if (profile.security?.score == null) profile.security = { isHttps: null, score: null, flags: [], measured: false };
+  if (profile.responseMeasured !== true) {
+    profile.avgResponseTimeMs = null;
+    profile.responseMeasured = false;
+  }
   const alreadyScored = profile.seo?.pages?.length && !seoSources.has(profile);
   if (!alreadyScored && signal.seo) {
     const seos = seoSources.get(profile) || [];

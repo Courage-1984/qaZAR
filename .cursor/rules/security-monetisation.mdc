@@ -1,6 +1,6 @@
 ---
 description: Security and multi-tenant monetisation invariants for qaZAR
-globs: server/routes/**,server/crawler/**,server/store/**
+globs: server/routes/**,server/crawler/**,server/storage/**
 alwaysApply: false
 ---
 

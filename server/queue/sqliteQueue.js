@@ -59,6 +59,23 @@ export function fail(jobId, err, now = Date.now()) {
   return false;
 }
 
+/** A new worker process is the only worker, so take back rows left leased by the last one. */
+export function reclaimLeased(now = Date.now()) {
+  getDb().prepare(`
+    UPDATE jobs
+    SET status = 'queued', lease_until = NULL, worker_id = NULL, available_at = ?
+    WHERE status = 'leased'
+  `).run(now);
+}
+
+export function countJobs() {
+  const counts = { queued: 0, leased: 0 };
+  for (const row of getDb().prepare(`SELECT status, COUNT(*) AS n FROM jobs GROUP BY status`).all()) {
+    counts[row.status] = row.n;
+  }
+  return counts;
+}
+
 export function reclaimExpired(now = Date.now()) {
   const rows = getDb().prepare(`SELECT id, attempts FROM jobs WHERE status = 'leased' AND lease_until < ?`).all(now);
   for (const row of rows) {

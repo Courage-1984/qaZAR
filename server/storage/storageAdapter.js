@@ -1,12 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { config, runsDir, baselinesDir } from '../config.js';
+import { runsDir, baselinesDir } from '../config.js';
+import { S3Storage } from './s3Storage.js';
+
+export function siteHash(domain) {
+  return String(domain || '').replace(/https?:\/\//, '').replace(/[^a-zA-Z0-9.-]/g, '_');
+}
 
 /**
- * Storage adapter interface for run artifacts and baselines.
- * Local filesystem implementation by default; ready for S3 / Cloudflare R2 drop-in.
+ * Storage adapter. Local disk by default. STORAGE_DRIVER=s3 selects S3 or R2.
  */
 class LocalFileStorageAdapter {
+  driver = 'local';
   get runsRoot() { return runsDir(); }
   get baselinesRoot() { return baselinesDir(); }
 
@@ -48,8 +53,14 @@ class LocalFileStorageAdapter {
   }
 
   getBaselinePath(domain, slug, viewport) {
-    const siteHash = domain.replace(/https?:\/\//, '').replace(/[^a-zA-Z0-9.-]/g, '_');
-    return path.join(this.baselinesRoot, siteHash, slug, `${viewport}.png`);
+    return path.join(this.baselinesRoot, siteHash(domain), slug, `${viewport}.png`);
+  }
+
+  mirrorArtifact() {}
+
+  deleteBaselineSite(hash) {
+    const dir = path.join(this.baselinesRoot, hash);
+    if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
   }
 
   hasBaseline(domain, slug, viewport) {
@@ -64,4 +75,10 @@ class LocalFileStorageAdapter {
   }
 }
 
-export const storage = new LocalFileStorageAdapter();
+export function createStorage() {
+  const local = new LocalFileStorageAdapter();
+  if (process.env.STORAGE_DRIVER === 's3') return new S3Storage(local);
+  return local;
+}
+
+export const storage = createStorage();

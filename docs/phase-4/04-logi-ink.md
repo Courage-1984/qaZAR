@@ -1,3 +1,5 @@
+Implemented. The live list is [TODOS.md](../../TODOS.md).
+
 # Pillar 4 — Logi-Ink seam
 
 Logi-Ink stays static HTML, vanilla JS, and Vite. No React, Vue, Tailwind, or Express app on that site. The work in this file is specified for the Logi-Ink repo (`c:\Users\Dr0sera\Github\logi-ink`). qaZAR only exposes the key-gated API from pillars 1–3.

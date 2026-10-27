@@ -5,11 +5,12 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import { config } from './config.js';
-import { listRuns, loadAll } from './storage/runStore.js';
+import { countActiveRuns, loadAll } from './storage/runStore.js';
 import { runsRouter } from './routes/runs.js';
 import { shareRouter } from './routes/share.js';
 import { artifactHandler } from './routes/artifacts.js';
 import { attachAuth, operatorToken, setOperatorCookie } from './auth/apiKey.js';
+import { checkoutHandler, webhookHandler } from './billing/stripeBilling.js';
 
 function getLocalIp() {
   try {
@@ -68,6 +69,7 @@ export function createApp() {
   const app = express();
   app.set('trust proxy', 1);
   app.use(cors({ origin: (origin, cb) => cb(null, originAllowed(origin)) }));
+  app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), webhookHandler);
   app.use(express.json({ limit: '16kb' }));
   app.use('/api', (_req, res, next) => {
     res.set('Cache-Control', 'no-store');
@@ -82,7 +84,7 @@ export function createApp() {
       version: '0.1.0',
       uptimeSec: Math.round(process.uptime()),
       memoryMb: Math.round(mem.rss / 1024 / 1024),
-      activeRuns: listRuns().filter((r) => ['queued', 'crawling', 'capturing'].includes(r.status)).length,
+      activeRuns: countActiveRuns(),
     });
   };
   app.get('/healthz', health);
@@ -103,6 +105,7 @@ export function createApp() {
     res.json({ ok: true });
   });
 
+  app.post('/api/billing/checkout', attachAuth, checkoutHandler);
   app.use('/api/runs', attachAuth, postByIp, postByKey, runsRouter);
   app.use('/api/share', shareByIp, shareRouter);
   app.use('/api/artifacts', attachAuth, artifactHandler);

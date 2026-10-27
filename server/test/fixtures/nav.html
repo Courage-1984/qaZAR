@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Nav</title>
+  <style>
+    body { margin: 0; }
+    #open { white-space: nowrap; }
+    #open a { display: inline-block; width: 120px; }
+  </style>
+</head>
+<body>
+  <button class="hamburger" aria-label="menu">Menu</button>
+  <nav id="open">
+    <a href="/a">One</a><a href="/b">Two</a><a href="/c">Three</a><a href="/d">Four</a>
+  </nav>
+  <nav id="empty" style="display:block;width:200px;height:40px"></nav>
+  <nav id="ok" style="display:block;width:200px;height:40px"><button class="hamburger" aria-label="menu">Menu</button></nav>
+</body>
+</html>

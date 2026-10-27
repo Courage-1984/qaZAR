@@ -5,7 +5,6 @@ import { config } from '../config.js';
 import { VIEWPORTS, contextOptions } from './viewports.js';
 import { evaluate } from '../heuristics/evaluate.js';
 import { assertPublicUrl } from '../routes/validate.js';
-import { waitForHost } from '../crawler/hostGate.js';
 
 const FREEZE_CSS = `*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important;scroll-behavior:auto!important}`;
 
@@ -58,34 +57,42 @@ async function autoScroll(page) {
  * Capture one page at one viewport in a fresh, isolated context.
  * Returns { shotFile (absolute), violations, metrics }.
  */
-export async function capturePage(url, vp, outFile, { collectLeads = false } = {}) {
+export async function capturePage(url, vp, outFile, { collectLeads = false, deterministic = false } = {}) {
   const browser = await getBrowser();
   const context = await browser.newContext(contextOptions(vp));
-  let release = () => {};
   try {
-    await context.addInitScript(() => {
-      const fixed = new Date('2024-01-01T12:00:00Z').getTime();
-      const RealDate = Date;
-      // eslint-disable-next-line no-global-assign
-      Date = class extends RealDate {
-        constructor(...a) { a.length ? super(...a) : super(fixed); }
-        static now() { return fixed; }
-      };
-      let s = 42;
-      Math.random = () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
-    });
+    if (deterministic) {
+      await context.addInitScript(() => {
+        const fixed = new Date('2024-01-01T12:00:00Z').getTime();
+        const RealDate = Date;
+        // eslint-disable-next-line no-global-assign
+        Date = class extends RealDate {
+          constructor(...a) { a.length ? super(...a) : super(fixed); }
+          static now() { return fixed; }
+        };
+        let s = 42;
+        Math.random = () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
+      });
+    }
     const page = await context.newPage();
-    release = await waitForHost(new URL(url).origin);
+    const mark = () => Date.now();
+    let t = mark();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: config.navTimeoutMs });
+    const gotoMs = mark() - t;
     await assertPublicUrl(page.url(), 'redirect');
-    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    const idleMs = 0;
     await page.addStyleTag({ content: FREEZE_CSS });
+    t = mark();
     await autoScroll(page);
-    await page.evaluate(() => Promise.race([
-      document.fonts?.ready || Promise.resolve(),
-      new Promise((resolve) => setTimeout(resolve, 3000)),
+    const scrollMs = mark() - t;
+    t = mark();
+    const fontWait = await page.evaluate(() => Promise.race([
+      (document.fonts?.ready || Promise.resolve()).then(() => 'ready'),
+      new Promise((resolve) => setTimeout(() => resolve('cap'), 1500)),
     ]));
-    await page.waitForTimeout(250);
+    const fontMs = mark() - t;
+    const partial = fontWait === 'cap';
+    await page.waitForTimeout(100);
 
     const result = await page.evaluate(evaluate, { touch: vp.touch, viewportWidth: vp.width });
     const leadHtml = collectLeads
@@ -94,15 +101,17 @@ export async function capturePage(url, vp, outFile, { collectLeads = false } = {
 
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     fs.mkdirSync(path.dirname(outFile), { recursive: true });
+    t = mark();
     await page.screenshot({
       path: outFile,
       fullPage: true,
       animations: 'disabled',
       ...(height > config.maxShotHeight ? { clip: { x: 0, y: 0, width: vp.width, height: config.maxShotHeight } } : {}),
     });
-    return leadHtml ? { ...result, leadHtml } : result;
+    const timings = { gotoMs, idleMs, scrollMs, fontMs, shotMs: mark() - t };
+    const payload = { ...result, timings, partial };
+    return leadHtml ? { ...payload, leadHtml } : payload;
   } finally {
-    release();
     await context.close();
   }
 }

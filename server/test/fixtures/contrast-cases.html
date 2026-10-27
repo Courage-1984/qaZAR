@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Contrast cases</title>
+  <style>
+    body { margin: 0; background: #fff; color: #111; font-size: 16px; }
+    #pseudo { position: relative; }
+    #pseudo::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(#000, #fff); }
+  </style>
+</head>
+<body>
+  <p id="ghost" style="color:rgba(255,255,255,0.4);background:#000">Pale text on black.</p>
+  <section style="background:rgba(0,0,0,0.9)">
+    <p id="nested" style="color:#000;background:rgba(255,255,255,0.95)">Nested text stays readable.</p>
+  </section>
+  <p id="same" style="color:#777;background:#777">Same colour text.</p>
+  <p id="grad" style="color:#111;background-image:linear-gradient(#fff,#000)">Gradient text.</p>
+  <p id="photo" style="color:#111;background-image:url(data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7)">Photo text.</p>
+  <p id="pseudo">Pseudo text stays unmeasured.</p>
+  <p id="parent" style="color:#ccc;background:#fff"><span id="child" style="color:#111">Readable child text</span></p>
+</body>
+</html>

@@ -8,12 +8,13 @@ import { deleteRunRow, listRunPayloads, readByShare, readRun, upsertRun } from '
  * Run index in SQLite, with run.json kept beside the screenshots.
  * In-flight rows stay in-flight across a restart; the worker reclaims leases.
  */
-class JsonDatabaseAdapter {
+class SqliteRunStore {
   constructor() {
     this.events = new Map();
   }
 
   loadAll() {
+    if (storage.driver !== 'local') return;
     const runsDir = storage.runsRoot;
     if (!fs.existsSync(runsDir)) return;
     for (const id of fs.readdirSync(runsDir)) {
@@ -71,7 +72,7 @@ class JsonDatabaseAdapter {
   save(run) {
     if (!readRun(run.id) && !run.shareToken) return;
     upsertRun(run);
-    storage.writeArtifact(run.id, 'run.json', JSON.stringify(run, null, 2));
+    storage.writeArtifact(run.id, 'run.json', JSON.stringify(run));
     this.broadcast(run.id, {
       status: run.status,
       progress: run.progress,
@@ -106,4 +107,4 @@ class JsonDatabaseAdapter {
   }
 }
 
-export const db = new JsonDatabaseAdapter();
+export const db = new SqliteRunStore();

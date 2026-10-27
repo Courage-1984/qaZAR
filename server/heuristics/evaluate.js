@@ -5,9 +5,10 @@
  *
  * Rules:
  * - h-overflow / h-overflow-offender / h-overflow-masked
- * - touch-target-size
- * - body-font-size / text-font-size / heading-hierarchy
- * - wcag-contrast (WCAG AA 4.5:1, 3:1 for large text)
+ * - touch-target-size (info: optional 48px comfort, not WCAG AA)
+ * - target-size-minimum (warn: WCAG 2.2 SC 2.5.8 AA, 24px box or 24px spacing; 44px is AAA, not claimed)
+ * - body-font-size (info below 16px) / text-font-size / heading-hierarchy
+ * - wcag-contrast (WCAG AA 4.5:1, 3:1 for large text; image, gradient, and pseudo paints are needs-review)
  * - media-bleed
  * - element-collision
  * - nav-collapse (touch/mobile/tablet viewports)
@@ -94,28 +95,36 @@ export function evaluate({ touch, viewportWidth }) {
     add('h-overflow-masked', 'warn', document.body, 'overflow-x:hidden is masking content wider than the viewport');
   }
 
-  // --- 2. Touch Targets ---
+  // --- 2. Touch targets. 48px is advisory. AA is 24px, with a spacing exception. ---
   if (touch) {
-    const sel =
-      'a[href],button,input:not([type=hidden]),select,textarea,summary,[role=button],[role=link],[role=tab],[onclick],[tabindex]:not([tabindex="-1"])';
-    for (const el of document.querySelectorAll(sel)) {
-      if (!visible(el)) continue;
-      const r = el.getBoundingClientRect();
+    const sel = 'a[href],button,input:not([type=hidden]),select,textarea,summary,[role=button],[role=link],[role=tab],[onclick],[tabindex]:not([tabindex="-1"])';
+    const boxes = [...document.querySelectorAll(sel)].filter(visible).map((el) => ({ el, r: el.getBoundingClientRect() }));
+    for (const { el, r } of boxes) {
+      const w = Math.round(r.width);
+      const h = Math.round(r.height);
       if (r.width < 48 || r.height < 48) {
-        const inline = el.tagName === 'A' && getComputedStyle(el).display === 'inline' && el.closest('p,li,span,td');
-        add(
-          'touch-target-size',
-          inline ? 'warn' : 'error',
-          el,
-          `${Math.round(r.width)}x${Math.round(r.height)}px is below 48x48px${inline ? ' (inline text link)' : ''}`
-        );
+        add('touch-target-size', 'info', el, `${w}x${h}px is below the optional 48px comfort size, not WCAG AA`);
+      }
+      const inline = el.tagName === 'A' && getComputedStyle(el).display === 'inline' && !!el.closest('p, li');
+      if (inline || (r.width >= 24 && r.height >= 24)) continue;
+      let nearest = Infinity;
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      for (const other of boxes) {
+        if (other.el === el) continue;
+        const ox = other.r.left + other.r.width / 2;
+        const oy = other.r.top + other.r.height / 2;
+        nearest = Math.min(nearest, Math.hypot(cx - ox, cy - oy));
+      }
+      if (!(nearest < Infinity && nearest >= 24)) {
+        add('target-size-minimum', 'warn', el, `${w}x${h}px is under 24px without a 24px gap to the nearest target (WCAG 2.2 SC 2.5.8 AA). A 44px box is AAA and is not claimed here.`);
       }
     }
   }
 
   // --- 3. Typography ---
   const bodyFont = parseFloat(getComputedStyle(document.body).fontSize);
-  if (bodyFont < 16) add('body-font-size', 'error', document.body, `Body font-size is ${bodyFont}px (< 16px)`);
+  if (bodyFont < 16) add('body-font-size', 'info', document.body, `Body font-size is ${bodyFont}px, below the 16px reading suggestion`);
 
   const sizes = [];
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -196,26 +205,24 @@ export function evaluate({ touch, viewportWidth }) {
   }
 
   function getEffectiveBg(el) {
-    let cur = el;
-    let bg = { r: 255, g: 255, b: 255, a: 0 }; // start transparent
+    const layers = [];
     let hasBgImage = false;
-
+    let cur = el;
     while (cur && cur.nodeType === 1) {
       const cs = getComputedStyle(cur);
-      if (cs.backgroundImage && cs.backgroundImage !== 'none') {
-        hasBgImage = true;
+      if (cs.backgroundImage && cs.backgroundImage !== 'none') hasBgImage = true;
+      for (const pseudo of ['::before', '::after']) {
+        const pcs = getComputedStyle(cur, pseudo);
+        if (pcs.content && pcs.content !== 'none' && pcs.content !== 'normal' && pcs.backgroundImage && pcs.backgroundImage !== 'none') {
+          hasBgImage = true;
+        }
       }
       const c = parseColor(cs.backgroundColor);
-      if (c && c.a > 0) {
-        bg = composite(c, bg);
-        if (bg.a >= 0.99) break;
-      }
+      if (c && c.a > 0) layers.push(c);
       cur = cur.parentElement;
     }
-    // If reached root without solid background, composite onto default white (#fff)
-    if (bg.a < 0.99) {
-      bg = composite(bg, { r: 255, g: 255, b: 255, a: 1 });
-    }
+    let bg = { r: 255, g: 255, b: 255, a: 1 };
+    for (let i = layers.length - 1; i >= 0; i--) bg = composite(layers[i], bg);
     return { color: bg, hasBgImage };
   }
 
@@ -224,24 +231,28 @@ export function evaluate({ touch, viewportWidth }) {
     'p, h1, h2, h3, h4, h5, h6, button, a, label, span, li, dt, dd'
   );
   let checkedCount = 0;
+  let contrastSampleCapped = false;
   for (const el of textCandidates) {
-    if (checkedCount >= 60) break;
+    if (checkedCount >= 60) {
+      contrastSampleCapped = true;
+      break;
+    }
     if (!visible(el)) continue;
-    // only check if element has non-empty direct text or single child text
     const text = el.innerText ? el.innerText.trim() : '';
     if (text.length < 2) continue;
-
     const cs = getComputedStyle(el);
     const fg = parseColor(cs.color);
     if (!fg || fg.a < 0.1) continue;
-
+    const childOwnsColour = [...el.children].some((ch) => visible(ch) && (ch.innerText || '').trim().length > 1 && getComputedStyle(ch).color !== cs.color);
+    if (childOwnsColour) continue;
+    checkedCount++;
     const { color: bg, hasBgImage } = getEffectiveBg(el);
     if (hasBgImage) {
-      add('wcag-contrast-indeterminate', 'info', el, 'Text rests over background-image or gradient; manual review suggested');
+      add('wcag-contrast-indeterminate', 'info', el, 'Text rests over a background image, gradient, or pseudo-element; needs review, not a confirmed contrast failure');
       continue;
     }
-
-    const lFg = relLuminance(fg);
+    const painted = fg.a < 1 ? composite(fg, bg) : fg;
+    const lFg = relLuminance(painted);
     const lBg = relLuminance(bg);
     const ratio = contrastRatio(lFg, lBg);
 
@@ -249,8 +260,6 @@ export function evaluate({ touch, viewportWidth }) {
     const fWeight = parseInt(cs.fontWeight, 10) || 400;
     const isLarge = fSize >= 24 || (fSize >= 18.66 && fWeight >= 700);
     const minRatio = isLarge ? 3.0 : 4.5;
-
-    checkedCount++;
     if (ratio < minRatio) {
       add(
         'wcag-contrast',
@@ -261,15 +270,23 @@ export function evaluate({ touch, viewportWidth }) {
     }
   }
 
+  function clippedByAncestor(el) {
+    for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+      const ox = getComputedStyle(p).overflowX;
+      if (ox === 'hidden' || ox === 'auto' || ox === 'scroll' || ox === 'clip') return true;
+    }
+    return false;
+  }
+
   // --- 5. Media Bleed ---
   for (const el of document.querySelectorAll('img,video,iframe,canvas,object,embed')) {
-    if (!visible(el)) continue;
+    if (!visible(el) || clippedByAncestor(el)) continue;
     const r = el.getBoundingClientRect();
     const parent = el.parentElement;
     const pr = parent ? parent.getBoundingClientRect() : null;
     const cs = getComputedStyle(el);
-    const bleedsViewport = r.right > viewportWidth + 1;
-    const bleedsParent = pr && r.width > pr.width + 1 && getComputedStyle(parent).overflowX === 'visible';
+    const bleedsViewport = r.right > viewportWidth + 1 || r.left < -1;
+    const bleedsParent = pr && (r.right > pr.right + 1 || r.left < pr.left - 1) && getComputedStyle(parent).overflowX === 'visible';
     if (bleedsViewport || bleedsParent) {
       add(
         'media-bleed',
@@ -297,7 +314,6 @@ export function evaluate({ touch, viewportWidth }) {
 
     for (let j = i + 1; j < sampleLimit; j++) {
       const elB = layoutElements[j];
-      // Skip ancestor-descendant relationships
       if (elA.contains(elB) || elB.contains(elA)) continue;
 
       const rB = elB.getBoundingClientRect();
@@ -311,24 +327,11 @@ export function evaluate({ touch, viewportWidth }) {
 
       const overlapW = Math.min(rA.right, rB.right) - Math.max(rA.left, rB.left);
       const overlapH = Math.min(rA.bottom, rB.bottom) - Math.max(rA.top, rB.top);
-
-      // Substantial overlap check (> 12px in both dimensions)
       if (overlapW > 12 && overlapH > 12) {
-        const csA = getComputedStyle(elA);
-        const csB = getComputedStyle(elB);
-
-        // If one is background or modal/dropdown overlay, skip
-        const posA = csA.position;
-        const posB = csB.position;
-        if (posA === 'fixed' || posB === 'fixed') continue;
-
-        // Check if both elements are in document flow or collide in the same stacking plane
-        add(
-          'element-collision',
-          'warn',
-          elA,
-          `Element overlaps with ${selectorOf(elB)} by ${Math.round(overlapW)}x${Math.round(overlapH)}px`
-        );
+        if (getComputedStyle(elA).position === 'fixed' || getComputedStyle(elB).position === 'fixed') continue;
+        const mid = (box, other) => other.left + other.width / 2 >= box.left && other.left + other.width / 2 <= box.right && other.top + other.height / 2 >= box.top && other.top + other.height / 2 <= box.bottom;
+        const covering = (elA.matches('a,button,input,[role="button"]') && mid(rB, rA)) || (elB.matches('a,button,input,[role="button"]') && mid(rA, rB));
+        add('element-collision', 'warn', elA, `Possible overlap with ${selectorOf(elB)} by ${Math.round(overlapW)}x${Math.round(overlapH)}px${covering ? ' covering a control' : ''}`);
       }
     }
   }
@@ -342,26 +345,26 @@ export function evaluate({ touch, viewportWidth }) {
       if (navCs.overflowX === 'auto' || navCs.overflowX === 'scroll') continue;
       const links = [...nav.querySelectorAll('a[href]')].filter(visible);
       const navRect = nav.getBoundingClientRect();
-
-      // If navigation has 4 or more visible links horizontally stretched without wrapping or collapse
-      if (links.length >= 4) {
-        const first = links[0].getBoundingClientRect();
-        const last = links[links.length - 1].getBoundingClientRect();
-        const isHorizontal = Math.abs(first.top - last.top) < 15;
-
-        // Check if there is an off-canvas / hamburger menu toggle button present
-        const hasToggle = !!document.querySelector(
-          'button[aria-expanded], button[aria-controls], button[aria-label*="menu" i], button[aria-label*="nav" i], .hamburger, [data-toggle="collapse"], .nav-toggle, #menu-toggle, .navbar-toggler'
+      const hasToggle = !!nav.querySelector('button[aria-expanded], button[aria-controls], button[aria-label*="menu" i], button[aria-label*="nav" i], .hamburger, .nav-toggle, .navbar-toggler')
+        || (!!nav.id && !!document.querySelector(`button[aria-controls="${CSS.escape(nav.id)}"]`));
+      if (!links.length && !hasToggle) {
+        add('nav-not-collapsed', 'warn', nav, 'No visible navigation links and no menu toggle inside this nav');
+        continue;
+      }
+      if (links.length < 4) continue;
+      const first = links[0].getBoundingClientRect();
+      const last = links[links.length - 1].getBoundingClientRect();
+      const isHorizontal = Math.abs(first.top - last.top) < 15;
+      const overflows = last.right > viewportWidth || navRect.width > viewportWidth * 0.9;
+      if (isHorizontal && overflows) {
+        add(
+          'nav-not-collapsed',
+          'warn',
+          nav,
+          hasToggle
+            ? `A menu toggle is inside this nav but ${links.length} links are still visible across ${Math.round(navRect.width)}px`
+            : `Navigation shows ${links.length} horizontal links across ${Math.round(navRect.width)}px on viewport ${viewportWidth}px and no menu toggle was found inside this nav`
         );
-
-        if (isHorizontal && (last.right > viewportWidth || navRect.width > viewportWidth * 0.9) && !hasToggle) {
-          add(
-            'nav-not-collapsed',
-            'warn',
-            nav,
-            `Navigation shows ${links.length} horizontal links across ${Math.round(navRect.width)}px on viewport ${viewportWidth}px without responsive hamburger/collapse toggle`
-          );
-        }
       }
     }
   }
@@ -374,6 +377,9 @@ export function evaluate({ touch, viewportWidth }) {
       headings,
       scrollWidth: de.scrollWidth,
       scrollHeight: de.scrollHeight,
+      capped: Object.keys(counts).filter((rule) => counts[rule] > MAX_PER_RULE),
+      contrastSampleCapped,
+      collisionSampleCapped: layoutElements.length > 60,
     },
   };
 }

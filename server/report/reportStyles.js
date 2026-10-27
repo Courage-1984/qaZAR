@@ -1,11 +1,7 @@
-/**
- * Purple-pink executive report styles. Print stays light so PDF output remains readable.
- * @param {string} gradeColor
- * @returns {string}
- */
-export function getReportStyles(gradeColor = '#4ade80') {
+/** Purple-pink on-screen report styles. Print stays light so a saved PDF remains readable. */
+export function getReportStyles() {
   return `
-    :root { --bg:#070514; --card:rgba(28,12,48,.82); --border:rgba(244,114,182,.32); --text:#f7f2ff; --muted:#c9b6de; --accent:#e879f9; --grade:${gradeColor}; --ok:#4ade80; --warn:#fbbf24; --bad:#fb7185; }
+    :root { --bg:#070514; --card:rgba(28,12,48,.82); --border:rgba(244,114,182,.32); --text:#f7f2ff; --muted:#c9b6de; --accent:#e879f9; --ok:#4ade80; --warn:#fbbf24; --bad:#fb7185; }
     * { box-sizing: border-box; }
     body { margin:0; background:#070514; color:var(--text); font-family:Inter,system-ui,sans-serif; line-height:1.5; padding:1.5rem 1rem; }
     .bg-glow { position:fixed; inset:0; z-index:-1; background:
@@ -18,9 +14,6 @@ export function getReportStyles(gradeColor = '#4ade80') {
     .actions { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
     .badge-report { background:rgba(168,85,247,.2); color:#f5d0fe; font-size:.75rem; font-weight:700; padding:.35rem .7rem; border-radius:999px; border:1px solid var(--border); }
     .hero { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:1.5rem; margin-bottom:1.5rem; display:flex; flex-wrap:wrap; align-items:center; gap:1.5rem; box-shadow:0 20px 50px rgba(0,0,0,.35); }
-    .grade-circle { width:108px; height:108px; border-radius:50%; border:3px solid var(--grade); display:flex; flex-direction:column; align-items:center; justify-content:center; flex-shrink:0; background:radial-gradient(circle at 30% 30%,rgba(244,114,182,.35),transparent 62%); box-shadow:0 0 36px rgba(168,85,247,.35); }
-    .grade-val { font-size:2.25rem; font-weight:800; color:var(--grade); line-height:1; }
-    .grade-score { font-size:.8rem; color:var(--muted); }
     .hero-summary h1 { font-size:clamp(1.35rem,3vw,1.7rem); margin:.35rem 0; }
     .hero-summary p, .muted, .note { color:var(--muted); }
     .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr)); gap:1rem; margin-bottom:1.5rem; }

@@ -1,17 +1,6 @@
-/**
- * Lightweight, zero-overhead site profiler for extracting high-value ROI signals,
- * tech debt, and hot lead contact data directly during crawl time.
- */
 import { extractPageSeo } from './seo.js';
 import { extractLeads, scoreLeadHeat } from './leads.js';
 
-/**
- * Extracts metadata, tech stack clues, performance signals, and public contact info from HTML.
- * @param {string} html
- * @param {string} url
- * @param {number} responseTimeMs
- * @returns {object}
- */
 export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, headers = null) {
   const getH = (name) => {
     if (!headers) return null;
@@ -113,11 +102,6 @@ export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, hea
   return signals;
 }
 
-/**
- * Aggregates crawl signals across all crawled pages into a unified Lead & ROI profile.
- * @param {Array<object>} pageSignals
- * @returns {object}
- */
 export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
   const profile = {
     avgResponseTimeMs: 0,
@@ -142,7 +126,17 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
     },
   };
 
-  if (!pageSignals.length) return profile;
+  if (!pageSignals.length) {
+    profile.avgResponseTimeMs = null;
+    profile.responseMeasured = false;
+    profile.security = { isHttps: null, score: null, flags: [], measured: false };
+    profile.seoScore = null;
+    profile.codeHygiene.hasFavicon = null;
+    profile.codeHygiene.measured = false;
+    profile.assetHygiene.measured = false;
+    profile.socialSharing = { hasOpenGraph: null, hasCanonical: null, measured: false };
+    return profile;
+  }
 
   let totalTime = 0;
   for (const s of pageSignals) {
@@ -200,9 +194,14 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
   if (!profile.security.hasHsts) { profile.security.score -= 20; profile.security.flags.push('Missing HSTS'); }
   if (!profile.security.hasCsp) { profile.security.score -= 15; profile.security.flags.push('Missing CSP'); }
   if (profile.funnel.insecureFormsCount > 0) { profile.security.score -= 20; profile.security.flags.push('Insecure Form Submission'); }
-  profile.security.score = Math.max(25, profile.security.score);
+  profile.security.score = Math.max(0, profile.security.score);
+  profile.security.measured = true;
 
   profile.avgResponseTimeMs = Math.round(totalTime / pageSignals.length);
+  profile.responseMeasured = true;
+  profile.assetHygiene.measured = true;
+  profile.codeHygiene.measured = true;
+  profile.socialSharing.measured = true;
   profile.seoScore = Math.max(20, Math.min(100, profile.seoScore));
   profile.socialSharing.hasOpenGraph = profile.socialSharing.openGraphPages > 0;
   profile.socialSharing.hasCanonical = profile.socialSharing.canonicalPages > 0;
@@ -232,10 +231,12 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
     bookingLinks,
     leadHeat,
     seoScore: profile.seoScore,
+    responseMeasured: true,
     security: {
       isHttps: profile.security.isHttps,
       score: profile.security.score,
       flags: profile.security.flags,
+      measured: true,
     },
     assetHygiene: profile.assetHygiene,
     codeHygiene: profile.codeHygiene,

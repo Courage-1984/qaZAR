@@ -1,9 +1,11 @@
 import crypto from 'node:crypto';
-import { claim, complete, fail, heartbeat, reclaimExpired, retryLater } from './queue/sqliteQueue.js';
+import { claim, complete, countJobs, fail, heartbeat, reclaimExpired, reclaimLeased, retryLater } from './queue/sqliteQueue.js';
+import { dbPath } from './storage/sqliteDb.js';
 import { processRun } from './queue/jobQueue.js';
 import { deliverMail, BACKOFF } from './queue/finishRun.js';
 import { getRun, save } from './storage/runStore.js';
-import { closeBrowser } from './engine/capturePage.js';
+import { closeBrowser, getBrowser } from './engine/capturePage.js';
+import { pruneBaselines } from './quota/prune.js';
 
 const workerId = crypto.randomUUID();
 const LEASE = 60_000;
@@ -33,6 +35,7 @@ async function tick() {
   reclaimExpired();
   const job = claim(workerId, LEASE);
   if (!job) return false;
+  console.log(`qaZAR worker claimed ${job.kind} ${job.run_id}`);
   const beat = setInterval(() => {
     try { heartbeat(job.id, LEASE); } catch { /* lease row may be gone */ }
   }, 15_000);
@@ -43,6 +46,7 @@ async function tick() {
         await processRun(job.run_id);
         complete(job.id);
       } catch (e) {
+        console.error(`qaZAR worker audit failed ${job.run_id}: ${e.message || e}`);
         const dead = fail(job.id, e);
         if (dead) {
           const run = getRun(job.run_id);
@@ -74,5 +78,12 @@ async function loop() {
 
 process.on('SIGINT', () => { closeBrowser().finally(() => process.exit(0)); });
 process.on('SIGTERM', () => { closeBrowser().finally(() => process.exit(0)); });
+
+const counts = countJobs();
+console.log(`qaZAR worker ready (${dbPath()})`);
+console.log(`qaZAR worker jobs queued=${counts.queued || 0} leased=${counts.leased || 0}`);
+reclaimLeased();
+try { pruneBaselines(); } catch (e) { console.error('qaZAR worker prune', e.message || e); }
+getBrowser().catch((e) => console.error('qaZAR worker browser', e.message || e));
 
 loop();

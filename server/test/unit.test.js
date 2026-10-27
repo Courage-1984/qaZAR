@@ -83,66 +83,83 @@ Sitemap: https://example.com/sitemap.xml
   assert.equal(isUrlAllowed('https://example.com/admin/settings', parsed.disallows), false);
 });
 
-test('calculateHealthScore and clusterDefects eliminate noise and group patterns', async () => {
+test('calculateHealthScore reports coverage and keeps needs-review out of the contrast tally', async () => {
   const { calculateHealthScore, clusterDefects } = await import('../report/scoreCalculator.js');
   const mockRun = {
-    summary: { violations: { error: 2, warn: 4 }, changed: 1 },
+    input: { deterministic: true },
     pages: [
       {
         url: 'https://example.com/',
         viewports: {
-          mobile: { violations: [{ rule: 'touch-target-size', severity: 'error', selector: 'nav > a', detail: 'Touch target 24px' }] },
-          tablet: { violations: [{ rule: 'touch-target-size', severity: 'error', selector: 'nav > a', detail: 'Touch target 24px' }] },
+          mobile: {
+            status: 'unchanged',
+            partial: true,
+            metrics: { capped: ['wcag-contrast'] },
+            violations: [
+              { rule: 'target-size-minimum', severity: 'warn', selector: 'nav > a', detail: '20px' },
+              { rule: 'target-size-minimum', severity: 'error', selector: 'nav > a', detail: '20px' },
+            ],
+          },
+          tablet: { status: 'error', violations: [] },
+          desktop: { status: 'pending', violations: [] },
         },
       },
       {
         url: 'https://example.com/pricing',
         viewports: {
-          mobile: { violations: [{ rule: 'touch-target-size', severity: 'error', selector: 'nav > a', detail: 'Touch target 24px' }] },
+          mobile: {
+            status: 'unchanged',
+            violations: [
+              { rule: 'target-size-minimum', severity: 'warn', selector: 'nav > a', detail: '20px' },
+              { rule: 'wcag-contrast-indeterminate', severity: 'info', selector: 'p', detail: 'review' },
+              { rule: 'wcag-contrast', severity: 'error', selector: 'p', detail: '1.2:1' },
+            ],
+          },
         },
       },
     ],
   };
   const clusters = clusterDefects(mockRun);
-  assert.equal(clusters.length, 1);
-  assert.equal(clusters[0].totalOccurrences, 3);
-  assert.equal(clusters[0].isGlobal, true);
-
+  const warn = clusters.find((c) => c.rule === 'target-size-minimum' && c.severity === 'warn');
+  assert.equal(warn.observed, 'observed on 2 of 2 page(s)');
+  assert.equal(warn.isGlobal, undefined);
+  assert.equal(clusters.filter((c) => c.rule === 'target-size-minimum').length, 2);
   const result = calculateHealthScore(mockRun);
-  assert.ok(result.score > 0 && result.score <= 100);
-  assert.ok(['A', 'B', 'C', 'D', 'F'].includes(result.grade));
-  assert.equal(result.metrics.distinctErrors, 1);
-  assert.equal(result.metrics.globalDefects, 1);
-  assert.equal(result.metrics.rawErrors, 3);
-  assert.ok(result.roiAssessment.estimatedHours > 0);
-  assert.ok(result.roiAssessment.recommendationTitle);
-  assert.ok(result.roadmap);
-  assert.ok(result.roadmap.coreUx.length > 0);
-  assert.ok(result.roadmap.strategic.length > 0);
+  assert.equal(result.score, undefined);
+  assert.equal(result.grade, undefined);
+  assert.equal(result.roiAssessment, undefined);
+  assert.equal(result.metrics.categories.wcagContrast, 1);
+  assert.equal(result.metrics.totalCaptures, 2);
+  assert.match(result.metrics.coverageLine, /2 of 3 captures completed, 1 failed\. Some counts are capped and are not exhaustive\. 1 capture\(s\) hit the font wait and are partial\. Deterministic mode injected a frozen clock/);
+  assert.match(result.roadmap.coreUx.join(' '), /difficult to activate/);
 });
 
-test('generateExecutiveReport produces standalone HTML with lead generation CTA', async () => {
+test('generateExecutiveReport states measurements and omits unsupported conclusions', async () => {
   const { generateExecutiveReport } = await import('../report/reportGenerator.js');
+  const { generatePdfReport } = await import('../report/pdfReport.js');
   const mockRun = {
     id: 'test-run-123',
     createdAt: new Date().toISOString(),
     input: { domain: 'https://client-site.com' },
-    summary: { violations: { error: 1, warn: 0 }, changed: 0 },
-    pages: [],
-    siteProfile: { leadContacts: { emails: ['ceo@client.com'], phones: ['+1234567890'], socials: [] } },
+    pages: [{ url: 'https://client-site.com/', viewports: { mobile: { status: 'unchanged', violations: [] } } }],
+    siteProfile: {
+      security: { score: 0 },
+      leadContacts: { emails: ['ceo@client.com', 'privacy@client.com'], phones: ['+1234567890'], socials: [] },
+    },
   };
   const html = generateExecutiveReport(mockRun, 'leads@agency.com', { agency: 'Apex Advisory' });
-  assert.ok(html.includes('<!doctype html>'));
-  assert.ok(html.includes('Apex Advisory'));
-  assert.ok(html.includes('client-site.com'));
-  assert.ok(html.includes('Engineering Remediation vs. Rebuild Assessment'));
-  assert.ok(html.includes('Verified Domain Ownership &amp; Key Contacts'));
-  assert.ok(html.includes('ceo@client.com'));
-  assert.ok(html.includes('Print / Save PDF'));
-  assert.ok(html.includes('Copy Summary'));
-  assert.ok(html.includes('summary-md'));
-  assert.ok(html.includes('Request Full Remediation Plan'));
-  assert.ok(html.includes('mailto:leads@agency.com'));
+  const pdf = generatePdfReport(mockRun, 'leads@agency.com', { agency: 'Apex Advisory' });
+  for (const bit of ['Apex Advisory', 'ceo@client.com', 'not a sales contact', 'Publicly listed contacts', '0/100', 'Print / Save PDF', 'Copy Summary', 'summary-md', 'mailto:leads@agency.com', '1 of 1 captures completed']) {
+    assert.ok(html.includes(bit), bit);
+  }
+  assert.ok(pdf.includes('1 of 1 captures completed'));
+  for (const doc of [html, pdf]) {
+    assert.equal(doc.includes('Engineering Remediation'), false);
+    assert.equal(doc.includes('Verified Domain Ownership'), false);
+    assert.equal(doc.includes('Transport Protected'), false);
+    assert.equal(doc.includes('up to 28%'), false);
+    assert.equal(/grade/i.test(doc), false);
+  }
 });
 
 test('extractCrawlSignals detects tech stack, viewport meta, and lead contacts', async () => {

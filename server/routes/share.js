@@ -28,8 +28,7 @@ shareRouter.get('/:token', (req, res) => {
   res.json({
     status: run.status,
     progress: run.progress || null,
-    score: scored?.score ?? null,
-    grade: scored?.grade ?? null,
     domain: run.input?.domain || '',
+    coverage: scored?.metrics?.coverageLine || null,
   });
 });

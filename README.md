@@ -34,16 +34,13 @@ The Playwright engine emulates and isolates these exact viewports for every page
 
 The engine injects evaluations into the DOM on every viewport and flags:
 
-- **Touch Targets (Mobile/Tablet)**: Any `<button>`, `<a>`, or interactive control smaller than 48×48px on `touch: true` viewports.
-- **Responsive Breakage**: Detects horizontal scrolling (`scrollWidth > clientWidth`), unclipped layout offenders, and masked overflow.
-- **Typography Scaling**:
-  - Base body text dropping below 16px and median rendered text size.
-  - Heading hierarchy checks (`h1 >= h2 >= h3`).
-  - Cross-viewport scaling (flags static heading sizes on mobile or headings undersized relative to body text).
-- **Contrast Ratios (WCAG AA)**: Computes relative luminance and alpha-composited backgrounds. Flags contrast ratios below 4.5:1 (or 3:1 for large text).
-- **Element Collisions & Overlaps**: Computes bounding box intersections between non-nested text/button layout elements in the same flow plane.
-- **Media Bleed**: Flags images, videos, canvas, or iframes overflowing viewport or parent containers lacking responsive max-width rules.
-- **Standard Navigation Collapse**: Checks that multi-link desktop navigations collapse or provide a standard responsive toggle/hamburger menu on tablet/mobile viewports.
+- **Target size (touch viewports)**: WCAG 2.2 AA is 24×24px, with a spacing exception. 44×44px is AAA and is not claimed. Under 48×48px is an optional comfort note.
+- **Responsive breakage**: Horizontal scrolling, unclipped offenders, and masked overflow.
+- **Typography**: Body text under 16px is a reading suggestion. Heading-scale notes across viewports are advisory.
+- **Contrast (WCAG AA)**: Ancestor backgrounds are composited behind the text, then foreground alpha is applied. Image, gradient, and pseudo-element paints are needs-review, not confirmed failures.
+- **Overlaps**: A possible overlap. It is described as covering a control only when the overlap includes the centre of a link or button.
+- **Media bleed**: An image that escapes the page fails. A box clipped by an ancestor with overflow other than visible passes.
+- **Navigation**: A hamburger elsewhere in the document does not prove the menu collapsed.
 
 ## Visual Regression Engine
 
