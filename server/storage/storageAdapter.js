@@ -7,9 +7,10 @@ import { config, runsDir, baselinesDir } from '../config.js';
  * Local filesystem implementation by default; ready for S3 / Cloudflare R2 drop-in.
  */
 class LocalFileStorageAdapter {
+  get runsRoot() { return runsDir(); }
+  get baselinesRoot() { return baselinesDir(); }
+
   constructor() {
-    this.runsRoot = runsDir();
-    this.baselinesRoot = baselinesDir();
     fs.mkdirSync(this.runsRoot, { recursive: true });
     fs.mkdirSync(this.baselinesRoot, { recursive: true });
   }

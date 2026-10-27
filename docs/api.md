@@ -20,7 +20,7 @@ Returns system status, uptime, memory, and queue load.
 ## Run Management Endpoints
 
 ### `POST /api/runs`
-Submit a new site for QA testing.
+Submit a new site for QA testing. The GitHub Pages console calls this through the Cloudflare tunnel with no key. A partner (the Logi-Ink worker) sends `Authorization: Bearer` from `QAZAR_API_KEYS` (`keyId.secret.ownerId`). A public key is capped at `PUBLIC_MAX_PAGES` (default 5) and cannot set `renderJs` or `pages`. The response is `{ runId, shareToken }`.
 - **Request Body**:
   ```json
   {
@@ -83,5 +83,8 @@ Generates a client-ready HTML quality assessment report.
 
 ## Artifacts Endpoint
 
+### `GET /api/share/:token`
+Redacted progress for the emailed link: `status`, `progress`, `score`, `grade`, `domain`. `GET /api/share/:token/report.pdf` returns the PDF once the worker has written it.
+
 ### `GET /api/artifacts/:runId/*`
-Serves screenshots, baseline snapshots, and diff overlays directly from the storage adapter.
+Screenshots for the Pages console. A bearer key can read only that key's runs. The tunnel UI, which sends no key, can still load images.

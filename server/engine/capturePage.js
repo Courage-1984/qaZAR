@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { VIEWPORTS, contextOptions } from './viewports.js';
 import { evaluate } from '../heuristics/evaluate.js';
 import { assertPublicUrl } from '../routes/validate.js';
+import { waitForHost } from '../crawler/hostGate.js';
 
 const FREEZE_CSS = `*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important;scroll-behavior:auto!important}`;
 
@@ -60,6 +61,7 @@ async function autoScroll(page) {
 export async function capturePage(url, vp, outFile, { collectLeads = false } = {}) {
   const browser = await getBrowser();
   const context = await browser.newContext(contextOptions(vp));
+  let release = () => {};
   try {
     await context.addInitScript(() => {
       const fixed = new Date('2024-01-01T12:00:00Z').getTime();
@@ -73,6 +75,7 @@ export async function capturePage(url, vp, outFile, { collectLeads = false } = {
       Math.random = () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
     });
     const page = await context.newPage();
+    release = await waitForHost(new URL(url).origin);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: config.navTimeoutMs });
     await assertPublicUrl(page.url(), 'redirect');
     await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
@@ -99,6 +102,7 @@ export async function capturePage(url, vp, outFile, { collectLeads = false } = {
     });
     return leadHtml ? { ...result, leadHtml } : result;
   } finally {
+    release();
     await context.close();
   }
 }

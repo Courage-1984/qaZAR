@@ -8,6 +8,7 @@ import { parseRobotsTxt, isUrlAllowed } from './robots.js';
 import { fetchPublic, fetchPublicText, readCapped } from './safeFetch.js';
 import { config } from '../config.js';
 import { drainWaves } from '../util/batch.js';
+import { waitForHost } from './hostGate.js';
 
 /** Extract same-origin hrefs from HTML (regex; fast for static discovery). */
 export function extractLinks(html, baseUrl) {
@@ -47,6 +48,7 @@ async function bfs(start, max, { renderJs = false, onProgress, robotRules = { di
 
   await drainWaves(queue, concurrency, async (url) => {
     if (discovered.length >= limit) return;
+    const release = await waitForHost(new URL(url).origin, robotRules.crawlDelay || 0);
     try {
       let links = [];
       const t0 = performance.now();
@@ -74,6 +76,8 @@ async function bfs(start, max, { renderJs = false, onProgress, robotRules = { di
       }
     } catch {
       /* skip unreachable */
+    } finally {
+      release();
     }
   }, () => discovered.length < limit);
 
@@ -93,9 +97,9 @@ async function loadRobots(origin) {
   try {
     const { text } = await fetchPublicText(`${origin}/robots.txt`, { timeout: 5000, label: 'robots' });
     const parsed = parseRobotsTxt(text);
-    return { hasRobotsTxt: true, robotRules: { disallows: parsed.disallows, allows: parsed.allows } };
+    return { hasRobotsTxt: true, robotRules: { disallows: parsed.disallows, allows: parsed.allows, crawlDelay: parsed.crawlDelay || 0 } };
   } catch {
-    return { hasRobotsTxt: false, robotRules: { disallows: [], allows: [] } };
+    return { hasRobotsTxt: false, robotRules: { disallows: [], allows: [], crawlDelay: 0 } };
   }
 }
 
@@ -124,7 +128,7 @@ function emptyProfile(crawlMeta) {
  * Applies ROI ranking and profiles site technical debt and lead intelligence.
  * Returns { urls, source, siteProfile }.
  */
-export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs = false, pages = null, onProgress }) {
+export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs = false, pages = null, onProgress, concurrency = config.crawlConcurrency }) {
   const start = normalizeUrl(domain);
   const origin = new URL(start).origin;
   const { hasRobotsTxt, robotRules } = await loadRobots(origin);
@@ -145,7 +149,7 @@ export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs
 
   for (const s of candidates) {
     try {
-      sitemapUrls.push(...(await collectSitemapUrls(s, max_pages * 2, new Set(), config.crawlConcurrency, origin)));
+      sitemapUrls.push(...(await collectSitemapUrls(s, max_pages * 2, new Set(), concurrency, origin)));
     } catch {
       /* try next */
     }
@@ -163,7 +167,7 @@ export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs
   }
 
   onProgress?.('crawling:bfs', `Starting BFS discovery crawl on ${start}...`);
-  const { urls, siteProfile } = await bfs(start, max_pages, { renderJs, onProgress, robotRules });
+  const { urls, siteProfile } = await bfs(start, max_pages, { renderJs, onProgress, robotRules, concurrency });
   siteProfile.crawlMeta = { hasRobotsTxt, hasSitemap: false };
   return { urls: urls.length ? urls : [start], source: 'crawl', siteProfile };
 }

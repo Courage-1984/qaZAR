@@ -1,11 +1,12 @@
 services:
-  qazar:
+  api:
     build:
       context: .
       dockerfile: Dockerfile
     image: qazar:latest
     container_name: qazar-api
     restart: unless-stopped
+    command: ["node", "server/index.js"]
     ports:
       - "8787:8787"
     environment:
@@ -13,8 +14,6 @@ services:
       - DATA_DIR=/app/data
       - PAGE_CONCURRENCY=4
       - ALLOW_PRIVATE=0
-    # Crucial for Playwright: allocate 1GB shared memory to avoid Chromium rendering crashes
-    shm_size: '1gb'
     volumes:
       - ./data:/app/data
     healthcheck:
@@ -23,3 +22,21 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: qazar:latest
+    container_name: qazar-worker
+    restart: unless-stopped
+    command: ["node", "server/worker.js"]
+    depends_on:
+      - api
+    environment:
+      - DATA_DIR=/app/data
+      - PAGE_CONCURRENCY=4
+      - ALLOW_PRIVATE=0
+    shm_size: '1gb'
+    volumes:
+      - ./data:/app/data

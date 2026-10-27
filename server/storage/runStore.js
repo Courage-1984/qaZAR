@@ -5,6 +5,7 @@ export const runPath = (id) => storage.getRunDir(id);
 export const loadAll = () => db.loadAll();
 export const createRun = (input, opts) => db.create(input, opts);
 export const getRun = (id, opts) => db.get(id, opts);
+export const getByShareToken = (token) => db.getByShareToken(token);
 export const listRuns = (opts) => db.list(opts);
 export const save = (run) => db.save(run);
 export const removeRun = (id, opts) => db.delete(id, opts);

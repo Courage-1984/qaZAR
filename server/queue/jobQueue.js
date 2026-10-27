@@ -9,16 +9,13 @@ import { capturePage, VIEWPORTS } from '../engine/capturePage.js';
 import { absorbRendered } from '../crawler/absorb.js';
 import { baselinePath, hasBaseline, promote } from '../visual/baseline.js';
 import { diffImages } from '../visual/diff.js';
-import { getRun, runPath, removeRun, save } from '../storage/runStore.js';
+import { getRun, runPath, save } from '../storage/runStore.js';
 import { mapPool } from '../util/batch.js';
+import { finishRun } from './finishRun.js';
 
-const cancelled = new Set();
-export const cancelRun = (id) => cancelled.add(id);
-
-// sequential job queue: one run at a time
-let chain = Promise.resolve();
-export function enqueue(runId) {
-  chain = chain.then(() => processRun(runId)).catch((e) => console.error('run failed', e));
+function stopped(runId) {
+  const current = getRun(runId);
+  return !current || current.status === 'cancelled';
 }
 
 async function processViewport(run, page, vp) {
@@ -158,13 +155,14 @@ export function evaluateCrossViewport(page) {
 
 export async function processRun(runId) {
   const run = getRun(runId);
-  if (!run || cancelled.has(runId)) return;
+  if (!run || run.status === 'cancelled') return;
   try {
     run.status = 'crawling';
     run.crawlStage = 'sitemap';
     save(run);
     const { urls, source, siteProfile } = await buildQueue({
       ...run.input,
+      concurrency: run.input?.publicCaller ? 2 : config.crawlConcurrency,
       onProgress: (stage, message) => {
         run.crawlStage = stage;
         run.crawlMessage = message;
@@ -193,6 +191,7 @@ export async function processRun(runId) {
     let lastSave = 0;
     let pending = null;
     const persistRun = () => {
+      if (stopped(runId)) return;
       const now = Date.now();
       if (now - lastSave < 400) {
         if (!pending) pending = setTimeout(() => { pending = null; persistRun(); }, 400 - (now - lastSave));
@@ -200,12 +199,12 @@ export async function processRun(runId) {
       }
       lastSave = now;
       writing = writing.then(() => {
-        if (getRun(runId)) save(run);
+        if (!stopped(runId)) save(run);
       }).catch((e) => console.error('save failed', e));
     };
 
     await mapPool(tasks, config.pageConcurrency, async ({ page, vp }) => {
-      if (!cancelled.has(runId) && getRun(runId)) await processViewport(run, page, vp);
+      if (!stopped(runId)) await processViewport(run, page, vp);
       const left = remaining.get(page) - 1;
       remaining.set(page, left);
       if (left === 0) {
@@ -218,19 +217,18 @@ export async function processRun(runId) {
     if (pending) clearTimeout(pending);
     await writing;
 
-    if (!getRun(runId)) return;
+    if (stopped(runId)) return;
     run.summary = summarize(run);
-    run.status = cancelled.has(runId) ? 'cancelled' : 'done';
+    run.status = 'done';
+    run.finishedAt = new Date().toISOString();
+    save(run);
+    await finishRun(run);
   } catch (e) {
-    if (!getRun(runId)) return;
+    if (stopped(runId)) return;
     run.status = 'failed';
     run.error = String(e.message || e);
-  } finally {
-    if (!getRun(runId)) {
-      removeRun(runId);
-      return;
-    }
+    run.finishedAt = new Date().toISOString();
+    save(run);
+    throw e;
   }
-  run.finishedAt = new Date().toISOString();
-  save(run);
 }

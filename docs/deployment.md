@@ -69,3 +69,9 @@ server {
 | `PAGE_CONCURRENCY` | `4` | Simultaneous captures (page × viewport) per run |
 | `CRAWL_CONCURRENCY` | `6` | Simultaneous discovery fetches |
 | `ALLOW_PRIVATE` | `0` | Set `1` only in local fixture testing |
+| `QAZAR_API_KEYS` | empty | Partner keys: `keyId.secret.ownerId`. The Pages tunnel stays usable without one |
+| `PUBLIC_MAX_PAGES` | `5` | Page cap for a non-operator key |
+| `MAIL_PROVIDER` | `resend` | `resend` or `postmark` |
+| `MAIL_API_KEY` / `MAIL_FROM` / `AGENCY_INBOX` | empty | PDF mail. Unset mail is skipped when there is no prospect |
+
+The API process does not run Playwright. Start `npm run worker` (or the `worker` service in `docker-compose.yml`) beside `npm run server`. The tunnel and gist discovery stay on so GitHub Pages can keep finding the API. Set `NO_TUNNEL=1` only when you do not want a public URL.

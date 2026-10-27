@@ -43,21 +43,34 @@ export async function assertPublicUrl(raw, label) {
   return u.toString();
 }
 
-export async function validateRunInput(body = {}) {
+function prospectEmail(raw) {
+  const email = String(raw || '').trim();
+  if (!email) return '';
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('prospectEmail is not a valid email');
+  }
+  return email;
+}
+
+export async function validateRunInput(body = {}, { publicCaller = false } = {}) {
   const domain = await assertPublicUrl(String(body.domain || '').trim(), 'domain');
-  let sitemap_url = String(body.sitemap_url || '').trim();
+  let sitemap_url = publicCaller ? '' : String(body.sitemap_url || '').trim();
   if (sitemap_url) sitemap_url = await assertPublicUrl(sitemap_url, 'sitemap_url');
-  const n = Number.parseInt(body.max_pages ?? 10, 10);
+  const n = Number.parseInt(body.max_pages ?? (publicCaller ? config.publicMaxPages : 10), 10);
   if (!Number.isFinite(n) || n < 1) throw new Error('max_pages must be a positive integer');
-  const listed = resolveExplicitPages(domain, body.pages);
+  const listed = publicCaller ? [] : resolveExplicitPages(domain, body.pages);
   for (const page of listed) await assertPublicUrl(page, 'page');
   const pages = listed.length ? listed : null;
-  const renderJs = Boolean(body.renderJs);
+  const cap = publicCaller ? config.publicMaxPages : config.maxPagesCap;
   return {
     domain,
     sitemap_url: pages ? null : sitemap_url || null,
-    max_pages: pages ? pages.length : Math.min(n, config.maxPagesCap),
-    renderJs,
+    max_pages: pages ? Math.min(pages.length, cap) : Math.min(n, cap),
+    renderJs: publicCaller ? false : Boolean(body.renderJs),
     pages,
+    publicCaller,
+    prospectEmail: prospectEmail(body.prospectEmail),
+    prospectName: String(body.prospectName || '').slice(0, 120),
+    source: String(body.source || '').slice(0, 40),
   };
 }

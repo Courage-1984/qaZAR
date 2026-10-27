@@ -1,5 +1,5 @@
 # qaZAR Container Engine
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 
 # Install system dependencies for Playwright headless Chromium
 ENV DEBIAN_FRONTEND=noninteractive
