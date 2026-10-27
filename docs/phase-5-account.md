@@ -10,7 +10,7 @@ qaZAR exposes key-gated billing for the Logi-Ink account screen (separate repo):
 | `POST` | `/api/billing/checkout` | Bearer partner key | `{ url }` Stripe Checkout session |
 | `POST` | `/api/billing/webhook` | Stripe signature | updates `owners.tier` |
 
-Logi-Ink should call these through its Worker (same pattern as `/audit`), never embed `STRIPE_SECRET_KEY` or `QAZAR_API_KEY` in the static site. The qaZAR `web/account.html` page is the reference UI.
+Logi-Ink should call these through its Worker (same pattern as `/audit`), never embed `STRIPE_SECRET_KEY` or `QAZAR_API_KEY` in the static site. The Worker exposes `GET /billing/account` and `POST /billing/checkout`. The qaZAR `web/account.html` page is the reference UI.
 
 Public share status for prospects: `GET /api/share/:token` and UI `share.html?token=…`.
 
@@ -26,6 +26,10 @@ Public share status for prospects: `GET /api/share/:token` and UI `share.html?to
 - Run several processes: `npm run worker` in each, or `docker compose up -d --scale worker=3`.
 - Tune `PAGE_CONCURRENCY`, `PUBLIC_PAGE_CONCURRENCY`, `WORKER_IDLE_MS`, `WORKER_LEASE_MS`.
 
+## Baselines
+
+Files live at `baselines/<ownerId>/<siteHash>/<slug>/<viewport>.png`. Meta rows use primary key `(owner_id, site_hash)` so prune cannot delete another tenant’s tree.
+
 ## Security notes (intentional Pages seam)
 
-GitHub Pages still calls the public tunnel **without** a bearer key and is treated as `ownerId=operator`. Partner keys are always tenant-scoped. Baselines remain keyed by site hash today; per-owner baseline isolation is a later change. Prefer Compose secrets / a restricted env file for `QAZAR_API_KEYS` and `STRIPE_*` in production.
+GitHub Pages still calls the public tunnel **without** a bearer key and is treated as `ownerId=operator`. Partner keys are always tenant-scoped. Unauthenticated artifact GETs are limited to media (`.png`/`.pdf`/…); `run.json` stays private. Prefer Compose secrets / a restricted env file for `QAZAR_API_KEYS` and `STRIPE_*` in production.

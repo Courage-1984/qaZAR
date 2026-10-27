@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { VIEWPORTS, contextOptions } from './viewports.js';
 import { evaluate } from '../heuristics/evaluate.js';
 import { assertPublicUrl } from '../routes/validate.js';
+import { installNavGuard } from './navGuard.js';
 
 const FREEZE_CSS = `*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important;scroll-behavior:auto!important}`;
 
@@ -78,14 +79,8 @@ export async function capturePage(url, vp, outFile, {
         Math.random = () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
       });
     }
+    await installNavGuard(context);
     const page = await context.newPage();
-    await page.route('**/*', async (route) => {
-      if (route.request().resourceType() === 'document') {
-        try { await assertPublicUrl(route.request().url(), 'nav'); }
-        catch { return route.abort('blockedbyclient'); }
-      }
-      return route.continue();
-    });
     const mark = () => Date.now();
     let t = mark();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: config.navTimeoutMs });

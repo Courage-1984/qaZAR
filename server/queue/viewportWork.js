@@ -45,15 +45,16 @@ export async function processViewport(run, page, vp) {
     if (res.partial) rec.partial = true;
 
     const domain = run.input.domain;
-    if (!hasBaseline(domain, page.slug, vp.name)) {
-      promote(domain, page.slug, vp.name, abs);
+    const ownerId = run.ownerId || 'operator';
+    if (!hasBaseline(domain, page.slug, vp.name, ownerId)) {
+      promote(domain, page.slug, vp.name, abs, ownerId);
       rec.status = 'new';
     } else {
       const baseRel = path.join('base', page.slug, `${vp.name}.png`);
       const diffRel = path.join('diffs', page.slug, `${vp.name}.png`);
       fs.mkdirSync(path.dirname(path.join(dir, baseRel)), { recursive: true });
       fs.mkdirSync(path.dirname(path.join(dir, diffRel)), { recursive: true });
-      fs.copyFileSync(baselinePath(domain, page.slug, vp.name), path.join(dir, baseRel));
+      fs.copyFileSync(baselinePath(domain, page.slug, vp.name, ownerId), path.join(dir, baseRel));
       const d = diffImages(path.join(dir, baseRel), abs, path.join(dir, diffRel));
       rec.base = baseRel.replaceAll('\\', '/');
       rec.diff = diffRel.replaceAll('\\', '/');
@@ -62,7 +63,7 @@ export async function processViewport(run, page, vp) {
       rec.status = d.diffPercent >= config.diffThresholdPercent || d.sizeChanged ? 'changed' : 'unchanged';
     }
     if (rec.shot) await storage.mirrorArtifact(run.id, rec.shot);
-    await touchBaseline(siteHash(domain), run.ownerId || 'operator');
+    await touchBaseline(siteHash(domain), ownerId);
   } catch (e) {
     rec.status = 'error';
     rec.error = String(e.message || e).split('\n')[0];

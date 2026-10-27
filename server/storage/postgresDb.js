@@ -30,9 +30,10 @@ CREATE TABLE IF NOT EXISTS owners (
   stripe_customer_id TEXT
 );
 CREATE TABLE IF NOT EXISTS baseline_meta (
-  site_hash TEXT PRIMARY KEY,
   owner_id TEXT NOT NULL,
-  updated_at BIGINT NOT NULL
+  site_hash TEXT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  PRIMARY KEY (owner_id, site_hash)
 );
 CREATE INDEX IF NOT EXISTS jobs_claim_idx ON jobs (status, available_at, id);
 `;
@@ -49,8 +50,39 @@ export function getPool() {
   return pool;
 }
 
+async function migrateBaselineMeta(client) {
+  const { rows } = await client.query(`
+    SELECT a.attname
+    FROM pg_index i
+    JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+    WHERE i.indrelid = 'baseline_meta'::regclass AND i.indisprimary
+  `).catch(() => ({ rows: [] }));
+  const pk = rows.map((r) => r.attname);
+  if (pk.length === 1 && pk[0] === 'site_hash') {
+    await client.query(`
+      CREATE TABLE baseline_meta_new (
+        owner_id TEXT NOT NULL,
+        site_hash TEXT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        PRIMARY KEY (owner_id, site_hash)
+      );
+      INSERT INTO baseline_meta_new (owner_id, site_hash, updated_at)
+        SELECT owner_id, site_hash, updated_at FROM baseline_meta
+        ON CONFLICT DO NOTHING;
+      DROP TABLE baseline_meta;
+      ALTER TABLE baseline_meta_new RENAME TO baseline_meta;
+    `);
+  }
+}
+
 export async function initPostgres() {
-  await getPool().query(DDL);
+  const client = await getPool().connect();
+  try {
+    await client.query(DDL);
+    await migrateBaselineMeta(client);
+  } finally {
+    client.release();
+  }
   return dbPath();
 }
 
@@ -118,18 +150,18 @@ export async function setTierByCustomer(customerId, tier) {
 
 export async function touchBaseline(siteHash, ownerId, now = Date.now()) {
   await getPool().query(`
-    INSERT INTO baseline_meta (site_hash, owner_id, updated_at) VALUES ($1, $2, $3)
-    ON CONFLICT (site_hash) DO UPDATE SET owner_id = EXCLUDED.owner_id, updated_at = EXCLUDED.updated_at
-  `, [siteHash, ownerId, now]);
+    INSERT INTO baseline_meta (owner_id, site_hash, updated_at) VALUES ($1, $2, $3)
+    ON CONFLICT (owner_id, site_hash) DO UPDATE SET updated_at = EXCLUDED.updated_at
+  `, [ownerId, siteHash, now]);
 }
 
 export async function listBaselineMeta() {
-  const { rows } = await getPool().query('SELECT site_hash, owner_id, updated_at FROM baseline_meta');
+  const { rows } = await getPool().query('SELECT owner_id, site_hash, updated_at FROM baseline_meta');
   return rows;
 }
 
-export async function deleteBaselineMeta(siteHash) {
-  await getPool().query('DELETE FROM baseline_meta WHERE site_hash = $1', [siteHash]);
+export async function deleteBaselineMeta(ownerId, siteHash) {
+  await getPool().query('DELETE FROM baseline_meta WHERE owner_id = $1 AND site_hash = $2', [ownerId, siteHash]);
 }
 
 export async function countActiveRuns() {

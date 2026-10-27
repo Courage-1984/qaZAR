@@ -31,11 +31,16 @@ Live list. Phases 1 and 2 (viewport engine, heuristics, crawler, HTML report, Gi
 - Baseline, one page of example.com, 7 viewports: discovery 52 ms, capture 6358 ms. Every viewport spent about 500 ms in network idle. Fonts were 0–2 ms.
 - After dropping network idle: discovery 54 ms, capture 2574 ms. Idle was 0 ms on every viewport. The second navigation was warm, so part of the drop is cache, and the measured idle wait is gone.
 
+## Phase 5 follow-ons
+
+- [x] Per-owner baseline trees (`baselines/<owner>/<siteHash>/…`) and composite `baseline_meta` key.
+- [x] Block literal private-IP / metadata subresources during capture (`navGuard`).
+- [x] Pages/anonymous artifact access limited to media (no `run.json`).
+
 ## Later (not this release)
 
 - [ ] Precision and recall on live Logia and Logi-Ink runs, with retained, withdrawn, and needs-review findings. No replacement score.
 - [ ] Screenshot-pixel contrast, full keyboard menu tests, and a maintained accessibility engine.
-- [ ] Block private-IP subresources inside the captured page.
-- [ ] Logi-Ink production account screen wiring (Worker proxy to `/api/billing/*`).
+- [ ] Logi-Ink account *page* UI (Worker already proxies `GET /billing/account` + `POST /billing/checkout`).
 
 Phase 4’s old checklist is [TODOS-PHASE-4.md](TODOS-PHASE-4.md). It points here.

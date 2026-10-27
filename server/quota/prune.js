@@ -9,7 +9,7 @@ export async function pruneBaselines(now = Date.now()) {
     if (row.owner_id === 'operator') continue;
     const days = (await getTier(row.owner_id)) === 'pro' ? 365 : 14;
     if (now - row.updated_at < days * DAY) continue;
-    storage.deleteBaselineSite(row.site_hash);
-    await deleteBaselineMeta(row.site_hash);
+    storage.deleteBaselineSite(row.owner_id, row.site_hash);
+    await deleteBaselineMeta(row.owner_id, row.site_hash);
   }
 }
