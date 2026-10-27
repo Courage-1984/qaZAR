@@ -5,6 +5,7 @@ import { scoreUrl } from '../crawler/roiScorer.js';
 import { VIEWPORTS } from '../engine/capturePage.js';
 import { getRun, save } from '../storage/runStore.js';
 import { mapPool } from '../util/batch.js';
+import { createThrottledWriter } from '../util/throttle.js';
 import { finishRun } from './finishRun.js';
 import { evaluateCrossViewport, processViewport } from './viewportWork.js';
 
@@ -40,6 +41,12 @@ function note(runId, stage, seen) {
   return stage;
 }
 
+function runWriter(runId, run) {
+  return createThrottledWriter(async () => {
+    if (!(await stopped(runId))) await save(run);
+  });
+}
+
 export async function processRun(runId) {
   const run = await getRun(runId);
   if (!run || run.status === 'cancelled') return;
@@ -50,33 +57,18 @@ export async function processRun(runId) {
     await save(run);
     note(runId, 'crawling', seen);
     const crawlStarted = Date.now();
-    let crawlWrite = Promise.resolve();
-    let crawlLast = 0;
-    let crawlPending = null;
-    const saveCrawl = () => {
-      if (crawlPending) return;
-      const now = Date.now();
-      const wait = Math.max(0, 400 - (now - crawlLast));
-      crawlPending = setTimeout(() => {
-        crawlPending = null;
-        crawlLast = Date.now();
-        crawlWrite = crawlWrite.then(async () => {
-          if (!(await stopped(runId))) await save(run);
-        }).catch((e) => console.error('save failed', e));
-      }, wait);
-    };
+    const crawlSave = runWriter(runId, run);
     const { urls, source, siteProfile } = await buildQueue({
       ...run.input,
       concurrency: run.input?.publicCaller ? 2 : config.crawlConcurrency,
       onProgress: (stage, message) => {
         run.crawlStage = stage;
         run.crawlMessage = message;
-        saveCrawl();
+        crawlSave.schedule();
         note(runId, stage, seen);
       },
     });
-    if (crawlPending) clearTimeout(crawlPending);
-    await crawlWrite;
+    await crawlSave.drain();
     run.crawlMs = Date.now() - crawlStarted;
     await save(run);
     const captureStarted = Date.now();
@@ -99,21 +91,7 @@ export async function processRun(runId) {
 
     const tasks = run.pages.flatMap((page) => VIEWPORTS.map((vp) => ({ page, vp })));
     const remaining = new Map(run.pages.map((page) => [page, VIEWPORTS.length]));
-    let writing = Promise.resolve();
-    let lastSave = 0;
-    let pending = null;
-    const persistRun = () => {
-      if (pending) return;
-      const now = Date.now();
-      const wait = Math.max(0, 400 - (now - lastSave));
-      pending = setTimeout(() => {
-        pending = null;
-        lastSave = Date.now();
-        writing = writing.then(async () => {
-          if (!(await stopped(runId))) await save(run);
-        }).catch((e) => console.error('save failed', e));
-      }, wait);
-    };
+    const persist = runWriter(runId, run);
 
     const concurrency = run.input?.publicCaller
       ? Math.min(config.pageConcurrency, config.publicPageConcurrency || 6)
@@ -128,10 +106,9 @@ export async function processRun(runId) {
         run.progress.pagesDone++;
       }
       run.progress.capturesDone++;
-      persistRun();
+      persist.schedule();
     });
-    if (pending) clearTimeout(pending);
-    await writing;
+    await persist.drain();
 
     if (await stopped(runId)) return;
     run.captureMs = Date.now() - captureStarted;

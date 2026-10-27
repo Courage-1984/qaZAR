@@ -1,24 +1,10 @@
-import os from 'node:os';
 import { config } from './config.js';
 import { ensurePortFree } from './freePort.js';
 import { startPublicTunnel, publishDiscovery } from './tunnel.js';
+import { getLocalIp } from './util/localIp.js';
 
 process.on('uncaughtException', (err) => console.error('[qaZAR uncaughtException]:', err));
 process.on('unhandledRejection', (reason) => console.error('[qaZAR unhandledRejection]:', reason));
-
-function getLocalIp() {
-  try {
-    const nets = os.networkInterfaces();
-    for (const name of Object.keys(nets)) {
-      for (const net of nets[name] || []) {
-        if (net.family === 'IPv4' && !net.internal) return net.address;
-      }
-    }
-  } catch {
-    /* fallback */
-  }
-  return null;
-}
 
 await ensurePortFree(config.port);
 const host = config.host || '0.0.0.0';

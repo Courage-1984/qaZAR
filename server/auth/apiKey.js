@@ -1,8 +1,13 @@
 import crypto from 'node:crypto';
+import { timingSafeEqual } from '../util/timingSafeEqual.js';
 
 const COOKIE = 'qazar_session';
 
+let cachedRaw = null;
+let cachedKeys = [];
+
 export function loadApiKeys(raw = process.env.QAZAR_API_KEYS || '') {
+  if (raw === cachedRaw) return cachedKeys;
   const keys = [];
   for (const part of String(raw).split(',').map((s) => s.trim()).filter(Boolean)) {
     const bits = part.split('.');
@@ -13,14 +18,9 @@ export function loadApiKeys(raw = process.env.QAZAR_API_KEYS || '') {
       ownerId: bits[bits.length - 1],
     });
   }
+  cachedRaw = raw;
+  cachedKeys = keys;
   return keys;
-}
-
-function same(a, b) {
-  const left = Buffer.from(String(a));
-  const right = Buffer.from(String(b));
-  if (left.length !== right.length || left.length === 0) return false;
-  return crypto.timingSafeEqual(left, right);
 }
 
 function cookieValue(req) {
@@ -50,7 +50,7 @@ export function readBearer(req) {
 export function attachAuth(req, res, next) {
   const bearer = readBearer(req);
   if (bearer) {
-    const key = loadApiKeys().find((item) => same(item.secret, bearer));
+    const key = loadApiKeys().find((item) => timingSafeEqual(item.secret, bearer));
     if (!key) return res.status(401).json({ error: 'Unauthorized' });
     req.auth = {
       keyId: key.keyId,
@@ -61,7 +61,7 @@ export function attachAuth(req, res, next) {
     return next();
   }
   const token = cookieValue(req);
-  if (token && same(token, operatorToken())) {
+  if (token && timingSafeEqual(token, operatorToken())) {
     req.auth = { keyId: 'operator', ownerId: 'operator', via: 'cookie', publicCaller: false };
     return next();
   }

@@ -89,6 +89,10 @@ runsRouter.get('/:id/events', async (req, res) => {
   await push();
   subscribe(run.id, res);
   const keepAlive = setInterval(() => {
+    if (res.writableEnded) {
+      clearInterval(keepAlive);
+      return;
+    }
     push().catch(() => clearInterval(keepAlive));
   }, 2000);
   res.on('close', () => clearInterval(keepAlive));

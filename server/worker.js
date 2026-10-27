@@ -12,6 +12,7 @@ import { pruneBaselines } from './quota/prune.js';
 const workerId = process.env.WORKER_ID || crypto.randomUUID();
 const LEASE = Number(process.env.WORKER_LEASE_MS || 60_000);
 const IDLE_MS = Number(process.env.WORKER_IDLE_MS || 400);
+let stopping = false;
 
 async function emailJob(job) {
   const run = await getRun(job.run_id);
@@ -68,19 +69,25 @@ async function tick() {
 }
 
 async function loop() {
-  for (;;) {
+  while (!stopping) {
     try {
       const worked = await tick();
-      if (!worked) await new Promise((resolve) => setTimeout(resolve, IDLE_MS));
+      if (!worked && !stopping) await new Promise((resolve) => setTimeout(resolve, IDLE_MS));
     } catch (e) {
       console.error('worker tick failed', e);
-      await new Promise((resolve) => setTimeout(resolve, IDLE_MS));
+      if (!stopping) await new Promise((resolve) => setTimeout(resolve, IDLE_MS));
     }
   }
 }
 
-process.on('SIGINT', () => { closeBrowser().finally(() => process.exit(0)); });
-process.on('SIGTERM', () => { closeBrowser().finally(() => process.exit(0)); });
+function shutdown(signal) {
+  console.log(`qaZAR worker received ${signal}, draining…`);
+  stopping = true;
+  closeBrowser().finally(() => process.exit(0));
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 await awaitDb();
 const counts = await countJobs();

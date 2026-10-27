@@ -3,7 +3,6 @@ import cors from 'cors';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import path from 'node:path';
 import fs from 'node:fs';
-import os from 'node:os';
 import { config } from './config.js';
 import { countActiveRuns, loadAll } from './storage/runStore.js';
 import { awaitDb, dbDriver } from './storage/db.js';
@@ -12,21 +11,8 @@ import { shareRouter } from './routes/share.js';
 import { artifactHandler } from './routes/artifacts.js';
 import { attachAuth, operatorToken, setOperatorCookie } from './auth/apiKey.js';
 import { accountHandler, checkoutHandler, webhookHandler } from './billing/stripeBilling.js';
-import crypto from 'node:crypto';
-
-function getLocalIp() {
-  try {
-    const nets = os.networkInterfaces();
-    for (const name of Object.keys(nets)) {
-      for (const net of nets[name] || []) {
-        if (net.family === 'IPv4' && !net.internal) return net.address;
-      }
-    }
-  } catch {
-    /* fallback */
-  }
-  return null;
-}
+import { timingSafeEqual } from './util/timingSafeEqual.js';
+import { getLocalIp } from './util/localIp.js';
 
 function originAllowed(origin) {
   if (!origin) return true;
@@ -40,55 +26,36 @@ function originAllowed(origin) {
 const ipOf = (req) => ipKeyGenerator(req.ip || '127.0.0.1');
 const postsOnly = (req) => req.method !== 'POST';
 
-const postByIp = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: ipOf,
-  skip: postsOnly,
-});
+function limit({ windowMs, max, keyGenerator, skip }) {
+  return rateLimit({
+    windowMs,
+    limit: max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator,
+    ...(skip ? { skip } : {}),
+  });
+}
 
-const postByKey = rateLimit({
+const postByIp = limit({ windowMs: 15 * 60 * 1000, max: 10, keyGenerator: ipOf, skip: postsOnly });
+const postByKey = limit({
   windowMs: 15 * 60 * 1000,
-  limit: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
+  max: 30,
   keyGenerator: (req) => req.auth?.keyId || ipOf(req),
   skip: postsOnly,
 });
-
-const shareByIp = rateLimit({
-  windowMs: 60 * 1000,
-  limit: 60,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: ipOf,
-});
-
-const billingByKey = rateLimit({
+const shareByIp = limit({ windowMs: 60 * 1000, max: 60, keyGenerator: ipOf });
+const billingByKey = limit({
   windowMs: 15 * 60 * 1000,
-  limit: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
+  max: 20,
   keyGenerator: (req) => req.auth?.keyId || ipOf(req),
 });
-
-const readByIp = rateLimit({
+const readByIp = limit({
   windowMs: 60 * 1000,
-  limit: 120,
-  standardHeaders: true,
-  legacyHeaders: false,
+  max: 120,
   keyGenerator: ipOf,
   skip: (req) => req.method !== 'GET',
 });
-
-function sameHex(a, b) {
-  const left = Buffer.from(String(a));
-  const right = Buffer.from(String(b));
-  if (left.length !== right.length || left.length === 0) return false;
-  return crypto.timingSafeEqual(left, right);
-}
 
 export function createApp() {
   const app = express();
@@ -125,7 +92,7 @@ export function createApp() {
     const expected = process.env.QAZAR_OPERATOR_KEY || '';
     const left = operatorToken(supplied);
     const right = operatorToken(expected);
-    if (!expected || !sameHex(left, right)) {
+    if (!expected || !timingSafeEqual(left, right)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     setOperatorCookie(req, res);
