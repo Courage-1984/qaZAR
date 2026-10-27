@@ -127,6 +127,12 @@ test('heuristics: a hamburger outside the nav does not clear a broken menu', asy
   assert.equal(navs.some((v) => v.selector === '#ok'), false);
 });
 
+test('heuristics: unnamed or non-keyboard menu toggles are flagged', async () => {
+  const violations = await check('menu-toggle.html', { width: 390, height: 844, touch: true });
+  assert.ok(violations.some((v) => v.rule === 'menu-toggle-keyboard'));
+  assert.equal(violations.some((v) => v.rule === 'menu-toggle-name' && v.selector?.includes('ok')), false);
+});
+
 test('heuristics: detects low WCAG contrast ratio', async () => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();

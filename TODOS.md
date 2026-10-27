@@ -37,10 +37,15 @@ Live list. Phases 1 and 2 (viewport engine, heuristics, crawler, HTML report, Gi
 - [x] Block literal private-IP / metadata subresources during capture (`navGuard`).
 - [x] Pages/anonymous artifact access limited to media (no `run.json`).
 
+## Open follow-ons (this push)
+
+- [x] Finding-review scaffold (`retained` / `needs-review` / `withdrawn`) — see `docs/finding-review.md`. Live calibration on Logia/Logi-Ink still pending.
+- [x] Menu-toggle keyboard / accessible-name heuristics (`menu-toggle-keyboard`, `menu-toggle-name`).
+- [x] Logi-Ink account page UI + Worker billing proxy.
+
 ## Later (not this release)
 
-- [ ] Precision and recall on live Logia and Logi-Ink runs, with retained, withdrawn, and needs-review findings. No replacement score.
-- [ ] Screenshot-pixel contrast, full keyboard menu tests, and a maintained accessibility engine.
-- [ ] Logi-Ink account *page* UI (Worker already proxies `GET /billing/account` + `POST /billing/checkout`).
+- [ ] Live precision/recall calibration on Logia and Logi-Ink (apply overrides, publish retained/withdrawn rates).
+- [ ] Screenshot-pixel contrast sampler and a fuller accessibility engine beyond DOM heuristics.
 
 Phase 4’s old checklist is [TODOS-PHASE-4.md](TODOS-PHASE-4.md). It points here.

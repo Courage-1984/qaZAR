@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Menu toggle fixture</title>
+<style>
+  body{margin:0;font:16px/1.4 sans-serif}
+  .bad-toggle{display:inline-block;width:48px;height:48px;background:#333;color:#fff}
+  .ok{min-width:48px;min-height:48px}
+  nav a{display:inline-block;padding:12px}
+</style>
+</head>
+<body>
+  <nav aria-label="Broken">
+    <div class="hamburger bad-toggle" tabindex="-1"></div>
+    <a href="/a">One</a><a href="/b">Two</a><a href="/c">Three</a><a href="/d">Four</a>
+  </nav>
+  <nav aria-label="Named">
+    <button class="ok hamburger" type="button" aria-expanded="false" aria-controls="m" aria-label="Open menu"></button>
+    <div id="m" hidden></div>
+  </nav>
+</body>
+</html>
