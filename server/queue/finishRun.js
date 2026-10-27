@@ -3,7 +3,7 @@ import { renderReportPdf } from '../report/renderPdf.js';
 import { sendReport } from '../mail/sendReport.js';
 import { storage } from '../storage/storageAdapter.js';
 import { save } from '../storage/runStore.js';
-import { enqueue } from './sqliteQueue.js';
+import { enqueue } from './jobs.js';
 
 const BACKOFF = [60_000, 5 * 60_000, 15 * 60_000];
 
@@ -21,12 +21,12 @@ export async function finishRun(run) {
     await sendReport({ run });
     if (run.emailError) {
       run.emailError = null;
-      save(run);
+      await save(run);
     }
   } catch (e) {
     run.emailError = String(e.message || e).split('\n')[0];
-    save(run);
-    enqueue(run.id, 'email', BACKOFF[0]);
+    await save(run);
+    await enqueue(run.id, 'email', BACKOFF[0]);
   }
 }
 
@@ -35,7 +35,7 @@ export async function deliverMail(run) {
   await sendReport({ run });
   if (run.emailError) {
     run.emailError = null;
-    save(run);
+    await save(run);
   }
 }
 

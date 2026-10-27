@@ -4,7 +4,6 @@ services:
       context: .
       dockerfile: Dockerfile
     image: qazar:latest
-    container_name: qazar-api
     restart: unless-stopped
     command: ["node", "server/index.js"]
     ports:
@@ -14,6 +13,13 @@ services:
       - DATA_DIR=/app/data
       - PAGE_CONCURRENCY=4
       - ALLOW_PRIVATE=0
+      - NO_TUNNEL=${NO_TUNNEL:-1}
+      - DATABASE_URL=${DATABASE_URL:-}
+      - STORAGE_DRIVER=${STORAGE_DRIVER:-local}
+      - QAZAR_API_KEYS=${QAZAR_API_KEYS:-}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - STRIPE_PRICE_ID=${STRIPE_PRICE_ID:-}
     volumes:
       - ./data:/app/data
     healthcheck:
@@ -28,15 +34,21 @@ services:
       context: .
       dockerfile: Dockerfile
     image: qazar:latest
-    container_name: qazar-worker
     restart: unless-stopped
     command: ["node", "server/worker.js"]
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     environment:
       - DATA_DIR=/app/data
       - PAGE_CONCURRENCY=4
+      - PUBLIC_PAGE_CONCURRENCY=6
       - ALLOW_PRIVATE=0
+      - WORKER_IDLE_MS=400
+      - DATABASE_URL=${DATABASE_URL:-}
+      - STORAGE_DRIVER=${STORAGE_DRIVER:-local}
+      - QAZAR_API_KEYS=${QAZAR_API_KEYS:-}
     shm_size: '1gb'
     volumes:
       - ./data:/app/data
+# Scale capture workers: docker compose up -d --scale worker=3

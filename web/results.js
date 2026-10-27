@@ -119,10 +119,17 @@ function renderDetail(run) {
         </div>
       </div>
     ` : ''}
+    ${run.shareToken ? `<div class="card"><div class="kicker">Share</div>
+      <div class="row toolbar">
+        <input class="field" id="share-link" readonly value="${esc(new URL(api.sharePageUrl(run.shareToken), location.href).href)}" aria-label="Share link">
+        <button class="btn" id="copy-share" type="button">Copy</button>
+        <a class="btn" href="${esc(api.sharePageUrl(run.shareToken))}" target="_blank" rel="noopener">Open</a>
+      </div></div>` : ''}
     ${run.status === 'done' ? `<div class="row toolbar">
       <input class="field" type="text" id="agency-name" placeholder="Brand / Agency (optional)" value="${esc(savedAgency)}" title="Whitelabel brand for executive report">
       <a class="btn primary" id="btn-download-report" href="${api.reportUrl(run.id, { download: '1', agency: savedAgency || undefined })}" download>Download report</a>
       <a class="btn" id="btn-view-report" href="${api.reportUrl(run.id, { agency: savedAgency || undefined })}" target="_blank" rel="noopener">View report</a>
+      <a class="btn" href="${api.pdfUrl(run.id)}" target="_blank" rel="noopener">PDF</a>
       <button class="btn" id="promote-all">Set all captures as baseline</button>
     </div>
       <div class="card cta">
@@ -172,6 +179,15 @@ function renderDetail(run) {
   document.getElementById('promote-all')?.addEventListener('click', async () => {
     const r = await api.promote(run.id);
     alert(`Promoted ${r.promoted} captures to baseline.`);
+  });
+  document.getElementById('copy-share')?.addEventListener('click', async () => {
+    const input = document.getElementById('share-link');
+    try {
+      await navigator.clipboard.writeText(input.value);
+    } catch {
+      input.select();
+      document.execCommand('copy');
+    }
   });
   if (selected) renderCell(run, selected);
 }

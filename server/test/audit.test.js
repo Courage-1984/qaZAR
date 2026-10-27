@@ -14,6 +14,7 @@ test('mapped ipv6 and nat64 loopback addresses are private', async () => {
   assert.equal(isPrivateIp('::ffff:7f00:1'), true);
   assert.equal(isPrivateIp('::ffff:a9fe:a9fe'), true);
   assert.equal(isPrivateIp('64:ff9b::a9fe:a9fe'), true);
+  assert.equal(isPrivateIp('0:0:0:0:0:ffff:127.0.0.1'), true);
   assert.equal(isPrivateIp('1.1.1.1'), false);
   await assert.rejects(() => assertPublicUrl('http://[::ffff:127.0.0.1]/', 'domain'), /private address/);
 });

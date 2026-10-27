@@ -6,11 +6,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { config } from './config.js';
 import { countActiveRuns, loadAll } from './storage/runStore.js';
+import { awaitDb, dbDriver } from './storage/db.js';
 import { runsRouter } from './routes/runs.js';
 import { shareRouter } from './routes/share.js';
 import { artifactHandler } from './routes/artifacts.js';
 import { attachAuth, operatorToken, setOperatorCookie } from './auth/apiKey.js';
-import { checkoutHandler, webhookHandler } from './billing/stripeBilling.js';
+import { accountHandler, checkoutHandler, webhookHandler } from './billing/stripeBilling.js';
+import crypto from 'node:crypto';
 
 function getLocalIp() {
   try {
@@ -31,11 +33,11 @@ function originAllowed(origin) {
   let host = '';
   try { host = new URL(origin).hostname; } catch { return false; }
   if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('github.io')) return true;
+  if (host === 'logi-ink.co.za' || host.endsWith('.logi-ink.co.za')) return true;
   return config.allowedOrigins.includes(origin);
 }
 
 const ipOf = (req) => ipKeyGenerator(req.ip || '127.0.0.1');
-
 const postsOnly = (req) => req.method !== 'POST';
 
 const postByIp = rateLimit({
@@ -64,8 +66,31 @@ const shareByIp = rateLimit({
   keyGenerator: ipOf,
 });
 
+const billingByKey = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.auth?.keyId || ipOf(req),
+});
+
+const readByIp = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: ipOf,
+  skip: (req) => req.method !== 'GET',
+});
+
+function sameHex(a, b) {
+  const left = Buffer.from(String(a));
+  const right = Buffer.from(String(b));
+  if (left.length !== right.length || left.length === 0) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
 export function createApp() {
-  loadAll();
   const app = express();
   app.set('trust proxy', 1);
   app.use(cors({ origin: (origin, cb) => cb(null, originAllowed(origin)) }));
@@ -76,7 +101,7 @@ export function createApp() {
     next();
   });
 
-  const health = (_req, res) => {
+  const health = async (_req, res) => {
     const mem = process.memoryUsage();
     res.json({
       ok: true,
@@ -84,7 +109,9 @@ export function createApp() {
       version: '0.1.0',
       uptimeSec: Math.round(process.uptime()),
       memoryMb: Math.round(mem.rss / 1024 / 1024),
-      activeRuns: countActiveRuns(),
+      activeRuns: await countActiveRuns(),
+      db: dbDriver,
+      storage: config.storageDriver,
     });
   };
   app.get('/healthz', health);
@@ -98,17 +125,18 @@ export function createApp() {
     const expected = process.env.QAZAR_OPERATOR_KEY || '';
     const left = operatorToken(supplied);
     const right = operatorToken(expected);
-    if (!expected || left.length !== right.length || !left || left !== right) {
+    if (!expected || !sameHex(left, right)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     setOperatorCookie(req, res);
     res.json({ ok: true });
   });
 
-  app.post('/api/billing/checkout', attachAuth, checkoutHandler);
-  app.use('/api/runs', attachAuth, postByIp, postByKey, runsRouter);
+  app.get('/api/billing/account', attachAuth, accountHandler);
+  app.post('/api/billing/checkout', attachAuth, billingByKey, checkoutHandler);
+  app.use('/api/runs', attachAuth, readByIp, postByIp, postByKey, runsRouter);
   app.use('/api/share', shareByIp, shareRouter);
-  app.use('/api/artifacts', attachAuth, artifactHandler);
+  app.use('/api/artifacts', attachAuth, readByIp, artifactHandler);
 
   const webDist = path.resolve('web/dist');
   const webDir = path.resolve('web');
@@ -118,4 +146,11 @@ export function createApp() {
     res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
   });
   return app;
+}
+
+/** Ready app with DB schema loaded (required before listen in tests and index). */
+export async function createReadyApp() {
+  await awaitDb();
+  await loadAll();
+  return createApp();
 }

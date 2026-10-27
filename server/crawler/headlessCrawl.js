@@ -1,5 +1,6 @@
 import { getBrowser } from '../engine/capturePage.js';
 import { normalizeUrl, isAssetUrl, sameOrigin } from './normalize.js';
+import { assertPublicUrl } from '../routes/validate.js';
 
 /**
  * Discovers links from client-side rendered / SPA pages using a headless browser.
@@ -16,13 +17,18 @@ export async function extractLinksHeadless(url, timeoutMs = 20000) {
 
   const links = new Set();
   try {
-    await context.route('**/*', (route) => {
+    await context.route('**/*', async (route) => {
       const type = route.request().resourceType();
       if (type === 'image' || type === 'media' || type === 'font') return route.abort();
+      if (type === 'document') {
+        try { await assertPublicUrl(route.request().url(), 'nav'); }
+        catch { return route.abort('blockedbyclient'); }
+      }
       return route.continue();
     });
     const page = await context.newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+    await assertPublicUrl(page.url(), 'redirect');
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     const hrefs = await page.evaluate(() => {

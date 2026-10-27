@@ -8,8 +8,10 @@ export async function artifactHandler(req, res) {
   const parts = req.path.split('/').filter(Boolean);
   const runId = parts.shift();
   const rel = parts.join('/');
-  if (!runId || !rel || rel.includes('..')) return res.status(404).json({ error: 'Not found' });
-  const run = getRun(runId);
+  if (!runId || !rel || rel.includes('..') || path.isAbsolute(rel)) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  const run = await getRun(runId);
   if (!run) return res.status(404).json({ error: 'Not found' });
   if (req.auth?.via === 'key' && run.ownerId !== req.auth.ownerId) {
     return res.status(404).json({ error: 'Not found' });

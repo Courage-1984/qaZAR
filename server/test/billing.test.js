@@ -12,14 +12,15 @@ process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_secret';
 
 const { config } = await import('../config.js');
 config.dataDir = dir;
-const { createApp } = await import('../app.js');
-const { getTier } = await import('../storage/sqliteDb.js');
+const { createReadyApp } = await import('../app.js');
+const { getTier } = await import('../storage/db.js');
 
 let base;
 let server;
 test.before(async () => {
+  const app = await createReadyApp();
   server = await new Promise((resolve) => {
-    const handle = createApp().listen(0, '127.0.0.1', () => resolve(handle));
+    const handle = app.listen(0, '127.0.0.1', () => resolve(handle));
   });
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -45,5 +46,5 @@ test('a signed checkout completion sets the owner to pro', async () => {
     body: payload,
   });
   assert.equal(res.status, 200);
-  assert.equal(getTier('logi-ink'), 'pro');
+  assert.equal(await getTier('logi-ink'), 'pro');
 });

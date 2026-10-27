@@ -1,59 +1,62 @@
 import crypto from 'node:crypto';
-import { claim, complete, countJobs, fail, heartbeat, reclaimExpired, reclaimLeased, retryLater } from './queue/sqliteQueue.js';
-import { dbPath } from './storage/sqliteDb.js';
+import {
+  claim, complete, countJobs, fail, heartbeat, reclaimExpired, reclaimOrphanedLeases, retryLater, dbDriver,
+} from './queue/jobs.js';
+import { awaitDb, dbPath } from './storage/db.js';
 import { processRun } from './queue/jobQueue.js';
 import { deliverMail, BACKOFF } from './queue/finishRun.js';
 import { getRun, save } from './storage/runStore.js';
 import { closeBrowser, getBrowser } from './engine/capturePage.js';
 import { pruneBaselines } from './quota/prune.js';
 
-const workerId = crypto.randomUUID();
-const LEASE = 60_000;
+const workerId = process.env.WORKER_ID || crypto.randomUUID();
+const LEASE = Number(process.env.WORKER_LEASE_MS || 60_000);
+const IDLE_MS = Number(process.env.WORKER_IDLE_MS || 400);
 
 async function emailJob(job) {
-  const run = getRun(job.run_id);
+  const run = await getRun(job.run_id);
   if (!run) {
-    complete(job.id);
+    await complete(job.id);
     return;
   }
   try {
     await deliverMail(run);
-    complete(job.id);
+    await complete(job.id);
   } catch (e) {
     const next = (job.attempts || 0) + 1;
     if (next >= 3) {
       run.emailError = String(e.message || e).split('\n')[0];
-      save(run);
-      complete(job.id);
+      await save(run);
+      await complete(job.id);
       return;
     }
-    retryLater(job.id, BACKOFF[job.attempts] || BACKOFF[2], e);
+    await retryLater(job.id, BACKOFF[job.attempts] || BACKOFF[2], e);
   }
 }
 
 async function tick() {
-  reclaimExpired();
-  const job = claim(workerId, LEASE);
+  await reclaimExpired();
+  const job = await claim(workerId, LEASE);
   if (!job) return false;
-  console.log(`qaZAR worker claimed ${job.kind} ${job.run_id}`);
+  console.log(`qaZAR worker ${workerId.slice(0, 8)} claimed ${job.kind} ${job.run_id}`);
   const beat = setInterval(() => {
-    try { heartbeat(job.id, LEASE); } catch { /* lease row may be gone */ }
-  }, 15_000);
+    heartbeat(job.id, LEASE).catch(() => {});
+  }, Math.max(5_000, Math.floor(LEASE / 4)));
   try {
     if (job.kind === 'email') await emailJob(job);
     else {
       try {
         await processRun(job.run_id);
-        complete(job.id);
+        await complete(job.id);
       } catch (e) {
         console.error(`qaZAR worker audit failed ${job.run_id}: ${e.message || e}`);
-        const dead = fail(job.id, e);
+        const dead = await fail(job.id, e);
         if (dead) {
-          const run = getRun(job.run_id);
+          const run = await getRun(job.run_id);
           if (run && run.status !== 'cancelled') {
             run.status = 'failed';
             run.error = String(e.message || e).split('\n')[0];
-            save(run);
+            await save(run);
           }
         }
       }
@@ -68,10 +71,10 @@ async function loop() {
   for (;;) {
     try {
       const worked = await tick();
-      if (!worked) await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (!worked) await new Promise((resolve) => setTimeout(resolve, IDLE_MS));
     } catch (e) {
       console.error('worker tick failed', e);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, IDLE_MS));
     }
   }
 }
@@ -79,11 +82,12 @@ async function loop() {
 process.on('SIGINT', () => { closeBrowser().finally(() => process.exit(0)); });
 process.on('SIGTERM', () => { closeBrowser().finally(() => process.exit(0)); });
 
-const counts = countJobs();
-console.log(`qaZAR worker ready (${dbPath()})`);
+await awaitDb();
+const counts = await countJobs();
+console.log(`qaZAR worker ready (${dbDriver} ${dbPath()}) id=${workerId.slice(0, 8)}`);
 console.log(`qaZAR worker jobs queued=${counts.queued || 0} leased=${counts.leased || 0}`);
-reclaimLeased();
-try { pruneBaselines(); } catch (e) { console.error('qaZAR worker prune', e.message || e); }
+await reclaimOrphanedLeases();
+try { await pruneBaselines(); } catch (e) { console.error('qaZAR worker prune', e.message || e); }
 getBrowser().catch((e) => console.error('qaZAR worker browser', e.message || e));
 
 loop();

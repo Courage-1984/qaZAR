@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>qaZAR – Account</title>
+  <meta name="description" content="qaZAR partner account: current tier and Stripe Checkout.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="bg-glow" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="brand" href="./index.html"><span class="logo">qa</span>ZAR</a>
+    <nav aria-label="Primary">
+      <a href="./index.html" id="nav-submit">Submit</a>
+      <a href="./results.html" id="nav-results">Results</a>
+      <a class="active" href="./account.html" id="nav-account">Account</a>
+    </nav>
+  </header>
+  <main class="container" id="app">
+    <h1>Account</h1>
+    <p class="muted">Partner API key holders can see their tier and open Stripe Checkout. Logi-Ink embeds the same endpoints.</p>
+    <section class="card" aria-labelledby="key-title">
+      <h2 id="key-title">API key</h2>
+      <label for="api_key">Bearer secret</label>
+      <input id="api_key" type="password" autocomplete="off" placeholder="Paste partner API secret">
+      <label for="api_base">API base URL</label>
+      <input id="api_base" type="url" placeholder="https://your-qazar-server">
+      <button id="load" class="btn primary block" type="button">Load account</button>
+      <p id="msg" class="msg" role="status" aria-live="polite"></p>
+    </section>
+    <section class="card" id="tier-card" hidden aria-labelledby="tier-title">
+      <h2 id="tier-title">Current plan</h2>
+      <div id="tier-body" class="chips"></div>
+      <button id="checkout" class="btn primary block" type="button" hidden>Upgrade with Stripe</button>
+    </section>
+  </main>
+  <script type="module" src="./account.js"></script>
+</body>
+</html>

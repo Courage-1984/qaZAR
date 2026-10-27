@@ -3,16 +3,17 @@ import net from 'node:net';
 import { config } from '../config.js';
 import { resolveExplicitPages } from '../crawler/explicitPages.js';
 
-/** Last 32 bits of a dotted or hex IPv4 embedded in ::ffff: or 64:ff9b::. */
+/** Last 32 bits of a dotted or hex IPv4 embedded in ::ffff: or 64:ff9b:: (any expansion). */
 function embeddedIpv4(host) {
   const h = String(host).toLowerCase().replace(/^\[|\]$/g, '');
   if (net.isIPv4(h)) return h;
-  const dotted = h.match(/^(?:::ffff:|64:ff9b::)(\d{1,3}(?:\.\d{1,3}){3})$/);
+  const dotted = h.match(/(?:^|:)(?:ffff:|64:ff9b:)(\d{1,3}(?:\.\d{1,3}){3})$/);
   if (dotted && net.isIPv4(dotted[1])) return dotted[1];
-  const hex = h.match(/^(?:::ffff:|64:ff9b::)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
-  if (!hex) return null;
+  const hex = h.match(/(?:^|:)(?:ffff:|64:ff9b:)?([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (!hex || (!h.includes('ffff:') && !h.includes('64:ff9b:'))) return null;
   const hi = Number.parseInt(hex[1], 16);
   const lo = Number.parseInt(hex[2], 16);
+  if (!Number.isFinite(hi) || !Number.isFinite(lo)) return null;
   return `${(hi >> 8) & 255}.${hi & 255}.${(lo >> 8) & 255}.${lo & 255}`;
 }
 
@@ -35,8 +36,11 @@ export async function assertPublicUrl(raw, label) {
     throw new Error(`${label} is not a valid URL`);
   }
   if (!/^https?:$/.test(u.protocol)) throw new Error(`${label} must be http(s)`);
+  const host = u.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (host === 'metadata.google.internal' || host.endsWith('.internal') || host === 'kubernetes.default') {
+    throw new Error(`${label} host is not allowed`);
+  }
   if (config.allowPrivate) return u.toString();
-  const host = u.hostname.replace(/^\[|\]$/g, '');
   const addrs = net.isIP(host) ? [{ address: host }] : await dns.lookup(host, { all: true }).catch(() => []);
   if (!addrs.length) throw new Error(`${label} host could not be resolved`);
   if (addrs.some((a) => isPrivateIp(a.address))) throw new Error(`${label} resolves to a private address (set ALLOW_PRIVATE=1 to allow)`);

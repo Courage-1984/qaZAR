@@ -92,11 +92,11 @@ export function reclaimExpired(now = Date.now()) {
   }
 }
 
-export function cancelRun(id) {
-  const run = getRun(id);
+export async function cancelRun(id) {
+  const run = await getRun(id);
   if (run && !['done', 'failed'].includes(run.status)) {
     run.status = 'cancelled';
-    save(run);
+    await save(run);
   }
   getDb().prepare(`
     UPDATE jobs SET status = 'cancelled', lease_until = NULL

@@ -14,6 +14,8 @@ qaZAR consists of:
 ### Production Compose Run
 ```bash
 docker compose up -d
+# Multiple capture workers (shared DATA_DIR or DATABASE_URL):
+docker compose up -d --scale worker=3
 ```
 > [!IMPORTANT]
 > Playwright headless browser rendering across 7 viewports (including ultrawide 2560x1600) requires adequate shared memory. `docker-compose.yml` pre-configures `shm_size: '1gb'`.
@@ -21,6 +23,7 @@ docker compose up -d
 Verify the service is operational:
 ```bash
 curl http://localhost:8787/healthz
+# Expect ok, db (sqlite|postgres), storage (local|s3)
 ```
 
 ---
@@ -66,12 +69,17 @@ server {
 |---|---|---|
 | `PORT` | `8787` | API server listen port |
 | `DATA_DIR` | `./data` | Directory for runs, baselines, and diffs |
+| `DATABASE_URL` | empty | Postgres URL; omit to keep SQLite |
+| `STORAGE_DRIVER` | `local` | `s3` selects S3/R2 artifacts |
 | `PAGE_CONCURRENCY` | `4` | Simultaneous captures (page × viewport) per run |
+| `PUBLIC_PAGE_CONCURRENCY` | `6` | Capture concurrency for public/partner keys |
 | `CRAWL_CONCURRENCY` | `6` | Simultaneous discovery fetches |
 | `ALLOW_PRIVATE` | `0` | Set `1` only in local fixture testing |
 | `QAZAR_API_KEYS` | empty | Partner keys: `keyId.secret.ownerId`. The Pages tunnel stays usable without one |
 | `PUBLIC_MAX_PAGES` | `5` | Page cap for a non-operator key |
+| `QAZAR_SINGLE_WORKER` | unset | Set `1` only when a lone worker should reclaim all leased jobs on boot |
 | `MAIL_PROVIDER` | `resend` | `resend` or `postmark` |
 | `MAIL_API_KEY` / `MAIL_FROM` / `AGENCY_INBOX` | empty | PDF mail. Unset mail is skipped when there is no prospect |
+| `STRIPE_*` | empty | Billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID` |
 
-The API process does not run Playwright. Start `npm run worker` (or the `worker` service in `docker-compose.yml`) beside `npm run server`. The tunnel and gist discovery stay on so GitHub Pages can keep finding the API. Set `NO_TUNNEL=1` only when you do not want a public URL.
+The API process does not run Playwright. Start `npm run worker` (or scale the `worker` service) beside `npm run server`. See [phase-5-account.md](phase-5-account.md). Set `NO_TUNNEL=1` when you do not want a public URL.
