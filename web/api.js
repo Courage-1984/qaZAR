@@ -122,12 +122,9 @@ async function readBody(res) {
   return body;
 }
 
-async function req(path, opts) {
-  const send = (base) => fetch(base + path, {
-    ...opts,
-    cache: 'no-store',
-    headers: { 'Content-Type': 'application/json' },
-  });
+async function req(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  const send = (base) => fetch(base + path, { ...opts, cache: 'no-store', headers });
   let base = getApiBase();
   try {
     if (!base) throw new Error('No API base');
@@ -140,6 +137,10 @@ async function req(path, opts) {
   }
 }
 
+function withKey(key) {
+  return key ? { Authorization: `Bearer ${key}` } : {};
+}
+
 export const api = {
   health: () => req('/api/health'),
   autoDiscover: autoDiscoverApi,
@@ -148,8 +149,20 @@ export const api = {
   getRun: (id) => req(`/api/runs/${encodeURIComponent(id)}`),
   deleteRun: (id) => req(`/api/runs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   promote: (id, body = {}) => req(`/api/runs/${encodeURIComponent(id)}/baseline`, { method: 'POST', body: JSON.stringify(body) }),
+  account: (key) => req('/api/billing/account', { headers: withKey(key) }),
+  checkout: (key) => req('/api/billing/checkout', { method: 'POST', headers: withKey(key) }),
+  share: (token) => req(`/api/share/${encodeURIComponent(token)}`),
+  sharePdfUrl: (token) => `${getApiBase()}/api/share/${encodeURIComponent(token)}/report.pdf`,
+  sharePageUrl: (token) => {
+    const u = new URL('./share.html', location.href);
+    u.searchParams.set('token', token);
+    const base = getApiBase();
+    if (base) u.searchParams.set('api', base);
+    return `${u.pathname.split('/').pop()}?${u.searchParams}`;
+  },
   artifact: (runId, rel) => `${getApiBase()}/api/artifacts/${encodeURIComponent(runId)}/${rel.split('/').map(encodeURIComponent).join('/')}`,
   eventsUrl: (id) => `${getApiBase()}/api/runs/${encodeURIComponent(id)}/events`,
+  pdfUrl: (id) => `${getApiBase()}/api/runs/${encodeURIComponent(id)}/report.pdf`,
   reportUrl: (id, opts = {}) => {
     const raw = typeof opts === 'boolean' ? (opts ? { download: '1' } : {}) : opts;
     const p = Object.fromEntries(Object.entries(raw).filter(([, v]) => v != null && v !== ''));

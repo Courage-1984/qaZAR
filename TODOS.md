@@ -17,6 +17,15 @@ Live list. Phases 1 and 2 (viewport engine, heuristics, crawler, HTML report, Gi
 - [x] S3-compatible artifacts (`STORAGE_DRIVER=s3`, Cloudflare R2 via `S3_ENDPOINT`). Local disk stays the default.
 - [x] Stripe Checkout and webhook. `checkout.session.completed` sets pro. `customer.subscription.deleted` sets free.
 
+## Phase 5
+
+- [x] Account API + qaZAR `account.html` for Checkout / current tier (Logi-Ink embeds the same endpoints; see `docs/phase-5-account.md`).
+- [x] Postgres driver beside SQLite (`DATABASE_URL`, `FOR UPDATE SKIP LOCKED` claims).
+- [x] Multi-worker capture (expired-lease reclaim only; `docker compose --scale worker=N`).
+- [x] Hardening: share token UUID gate, metadata host block, billing rate limit, tenant artifact checks, health reports `db`/`storage`.
+- [x] Capture speed: drop settle wait, shorter scroll/font budgets for public callers, faster worker idle poll.
+- [x] UI: share page, copyable share link on results, PDF link, Account nav.
+
 ## Speed
 
 - Baseline, one page of example.com, 7 viewports: discovery 52 ms, capture 6358 ms. Every viewport spent about 500 ms in network idle. Fonts were 0–2 ms.
@@ -27,11 +36,6 @@ Live list. Phases 1 and 2 (viewport engine, heuristics, crawler, HTML report, Gi
 - [ ] Precision and recall on live Logia and Logi-Ink runs, with retained, withdrawn, and needs-review findings. No replacement score.
 - [ ] Screenshot-pixel contrast, full keyboard menu tests, and a maintained accessibility engine.
 - [ ] Block private-IP subresources inside the captured page.
-
-## Phase 5 (not started)
-
-- [ ] Logi-Ink account screen for Checkout and the current tier.
-- [ ] Postgres driver beside SQLite.
-- [ ] More than one capture worker.
+- [ ] Logi-Ink production account screen wiring (Worker proxy to `/api/billing/*`).
 
 Phase 4’s old checklist is [TODOS-PHASE-4.md](TODOS-PHASE-4.md). It points here.

@@ -10,6 +10,7 @@ const { config } = await import('../config.js');
 config.dataDir = dir;
 const { getDb } = await import('../storage/sqliteDb.js');
 const { claim, enqueue, reclaimExpired, reclaimLeased } = await import('../queue/sqliteQueue.js');
+const { reclaimOrphanedLeases } = await import('../queue/jobs.js');
 
 test('two claims take different jobs', () => {
   enqueue('run-a', 'audit');
@@ -41,7 +42,7 @@ test('an expired lease is queued again until the third reclaim', () => {
   assert.equal(row.attempts, 3);
 });
 
-test('a fresh worker reclaims a live lease without adding an attempt', () => {
+test('single-worker boot may reclaim a live lease without adding an attempt', () => {
   const database = getDb();
   database.prepare(`INSERT INTO jobs (id, run_id, kind, status, available_at, lease_until, attempts) VALUES ('job-boot', 'run-d', 'audit', 'leased', 0, 9999999999999, 2)`).run();
   reclaimLeased(50);
@@ -49,4 +50,14 @@ test('a fresh worker reclaims a live lease without adding an attempt', () => {
   assert.equal(row.status, 'queued');
   assert.equal(row.attempts, 2);
   assert.equal(row.lease_until, null);
+});
+
+test('multi-worker boot does not steal a live lease', async () => {
+  delete process.env.QAZAR_SINGLE_WORKER;
+  const database = getDb();
+  database.prepare(`INSERT INTO jobs (id, run_id, kind, status, available_at, lease_until, attempts) VALUES ('job-live', 'run-e', 'audit', 'leased', 0, 9999999999999, 0)`).run();
+  await reclaimOrphanedLeases(50);
+  const row = database.prepare(`SELECT status, attempts FROM jobs WHERE id = 'job-live'`).get();
+  assert.equal(row.status, 'leased');
+  assert.equal(row.attempts, 0);
 });

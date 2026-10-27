@@ -43,16 +43,13 @@ Viewport UI/UX QA + visual regression suite. Node/Express API + Playwright worke
   - VPS & live deployment (beyond GH Pages): reverse proxy (Caddy/Nginx), SSL, healthcheck (`GET /healthz`), and deployment guide.
   - Robots.txt parser and strict compliance across BFS and sitemaps.
   - High-ROI site profiling, lead intelligence extraction, and executive audit reports with print/PDF engine.
-- Tail End (Post-MVP):
-  - Auth, API keys, usage limits/quotas, tenant isolation (`ownerId`).
-  - DB/S3 storage migration (SQLite/PostgreSQL + Cloudflare R2 / AWS S3).
-  - Shareable unguessable public report permalinks.
-  - Paywall & payment processing.
+- Tail End (Completed): Auth/API keys, quotas, Stripe paywall, S3/R2, share permalinks, Postgres driver, multi-worker queue.
+- Next: Logi-Ink Worker proxy for `/api/billing/*`, precision/recall on live audits, private-IP subresource blocking.
 
 ## Known weak spots
 - Complex CSS pseudo-elements (::before/::after) background compositing can require indeterminate contrast flagging.
 - Collision check samples top 60 elements with viewport-intersection filtering.
-- Run state is in-memory + JSON files; restart marks in-flight runs `failed`.
+- Expired job leases are reclaimed; set `QAZAR_SINGLE_WORKER=1` only for a lone worker that should steal live leases on boot.
 - `evaluateCrossViewport` compares `desktop` vs `tablet` and `mobile` across H1/H2 and detects breakpoint style inversions.
 
 ## Agent tooling map

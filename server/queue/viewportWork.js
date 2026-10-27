@@ -7,7 +7,7 @@ import { baselinePath, hasBaseline, promote } from '../visual/baseline.js';
 import { diffImages } from '../visual/diff.js';
 import { runPath } from '../storage/runStore.js';
 import { siteHash, storage } from '../storage/storageAdapter.js';
-import { touchBaseline } from '../storage/sqliteDb.js';
+import { touchBaseline } from '../storage/db.js';
 
 export async function processViewport(run, page, vp) {
   const dir = runPath(run.id);
@@ -23,6 +23,7 @@ export async function processViewport(run, page, vp) {
         res = await capturePage(page.url, vp, abs, {
           collectLeads: vp.name === 'desktop',
           deterministic: run.input?.deterministic === true,
+          fast: Boolean(run.input?.publicCaller),
         });
       } catch (e) {
         lastErr = e;
@@ -61,7 +62,7 @@ export async function processViewport(run, page, vp) {
       rec.status = d.diffPercent >= config.diffThresholdPercent || d.sizeChanged ? 'changed' : 'unchanged';
     }
     if (rec.shot) await storage.mirrorArtifact(run.id, rec.shot);
-    touchBaseline(siteHash(domain), run.ownerId || 'operator');
+    await touchBaseline(siteHash(domain), run.ownerId || 'operator');
   } catch (e) {
     rec.status = 'error';
     rec.error = String(e.message || e).split('\n')[0];

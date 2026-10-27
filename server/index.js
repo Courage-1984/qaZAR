@@ -1,6 +1,5 @@
 import os from 'node:os';
 import { config } from './config.js';
-import { createApp } from './app.js';
 import { ensurePortFree } from './freePort.js';
 import { startPublicTunnel, publishDiscovery } from './tunnel.js';
 
@@ -23,7 +22,8 @@ function getLocalIp() {
 
 await ensurePortFree(config.port);
 const host = config.host || '0.0.0.0';
-const app = createApp();
+const { createReadyApp } = await import('./app.js');
+const app = await createReadyApp();
 let tunnelHandle = null;
 
 const server = app.listen(config.port, host, async () => {

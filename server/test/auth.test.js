@@ -14,14 +14,14 @@ const { config } = await import('../config.js');
 config.dataDir = dir;
 config.allowPrivate = true;
 
-const { createApp } = await import('../app.js');
+const { createReadyApp } = await import('../app.js');
 const { storage } = await import('../storage/storageAdapter.js');
 
 let base;
 let server;
 
 test.before(async () => {
-  const app = createApp();
+  const app = await createReadyApp();
   server = await new Promise((resolve) => {
     const handle = app.listen(0, '127.0.0.1', () => resolve(handle));
   });
@@ -70,19 +70,19 @@ test('body ownerId is ignored and a public key cannot widen the crawl', async ()
   assert.equal(run.input.renderJs, false);
   assert.equal(run.input.pages, null);
   const { getRun, save } = await import('../storage/runStore.js');
-  const stored = getRun(res.json.runId);
+  const stored = await getRun(res.json.runId);
   stored.status = 'done';
-  save(stored);
+  await save(stored);
 });
 
 test('share payload hides contacts and another owner cannot read artefacts', async () => {
   const res = await post('public-secret-value', { domain: 'http://127.0.0.1' });
   const { getRun, save } = await import('../storage/runStore.js');
-  const run = getRun(res.json.runId);
+  const run = await getRun(res.json.runId);
   run.siteProfile = { leadContacts: { emails: ['hidden@example.com'] } };
   run.status = 'done';
   run.summary = { changed: 0 };
-  save(run);
+  await save(run);
   storage.writeArtifact(run.id, 'shots/home/desktop.png', 'png');
   const share = await fetch(`${base}/api/share/${run.shareToken}`).then((r) => r.json());
   assert.equal(share.status, 'done');

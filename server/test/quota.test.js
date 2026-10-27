@@ -12,13 +12,14 @@ process.env.ALLOW_PRIVATE = '1';
 const { config } = await import('../config.js');
 config.dataDir = dir;
 config.allowPrivate = true;
-const { createApp } = await import('../app.js');
+const { createReadyApp } = await import('../app.js');
 
 let base;
 let server;
 test.before(async () => {
+  const app = await createReadyApp();
   server = await new Promise((resolve) => {
-    const handle = createApp().listen(0, '127.0.0.1', () => resolve(handle));
+    const handle = app.listen(0, '127.0.0.1', () => resolve(handle));
   });
   base = `http://127.0.0.1:${server.address().port}`;
 });

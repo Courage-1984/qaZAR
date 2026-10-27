@@ -1,4 +1,3 @@
-
 import { config } from '../config.js';
 import { buildQueue } from '../crawler/crawl.js';
 import { slugFor } from '../crawler/normalize.js';
@@ -11,8 +10,8 @@ import { evaluateCrossViewport, processViewport } from './viewportWork.js';
 
 export { evaluateCrossViewport };
 
-function stopped(runId) {
-  const current = getRun(runId);
+async function stopped(runId) {
+  const current = await getRun(runId);
   return !current || current.status === 'cancelled';
 }
 
@@ -42,29 +41,29 @@ function note(runId, stage, seen) {
 }
 
 export async function processRun(runId) {
-  const run = getRun(runId);
+  const run = await getRun(runId);
   if (!run || run.status === 'cancelled') return;
   const seen = { current: '' };
   try {
     run.status = 'crawling';
     run.crawlStage = 'sitemap';
-    save(run);
+    await save(run);
     note(runId, 'crawling', seen);
     const crawlStarted = Date.now();
     let crawlWrite = Promise.resolve();
     let crawlLast = 0;
     let crawlPending = null;
     const saveCrawl = () => {
-      if (stopped(runId)) return;
+      if (crawlPending) return;
       const now = Date.now();
-      if (now - crawlLast < 400) {
-        if (!crawlPending) crawlPending = setTimeout(() => { crawlPending = null; saveCrawl(); }, 400 - (now - crawlLast));
-        return;
-      }
-      crawlLast = now;
-      crawlWrite = crawlWrite.then(() => {
-        if (!stopped(runId)) save(run);
-      }).catch((e) => console.error('save failed', e));
+      const wait = Math.max(0, 400 - (now - crawlLast));
+      crawlPending = setTimeout(() => {
+        crawlPending = null;
+        crawlLast = Date.now();
+        crawlWrite = crawlWrite.then(async () => {
+          if (!(await stopped(runId))) await save(run);
+        }).catch((e) => console.error('save failed', e));
+      }, wait);
     };
     const { urls, source, siteProfile } = await buildQueue({
       ...run.input,
@@ -79,7 +78,7 @@ export async function processRun(runId) {
     if (crawlPending) clearTimeout(crawlPending);
     await crawlWrite;
     run.crawlMs = Date.now() - crawlStarted;
-    save(run);
+    await save(run);
     const captureStarted = Date.now();
     if (!urls.length) throw new Error('No pages found (sitemap empty and crawl found nothing)');
     run.crawlSource = source;
@@ -95,7 +94,7 @@ export async function processRun(runId) {
     });
     run.progress = { pagesDone: 0, pagesTotal: urls.length, capturesDone: 0, capturesTotal: urls.length * VIEWPORTS.length };
     run.status = 'capturing';
-    save(run);
+    await save(run);
     note(runId, 'capturing', seen);
 
     const tasks = run.pages.flatMap((page) => VIEWPORTS.map((vp) => ({ page, vp })));
@@ -104,20 +103,24 @@ export async function processRun(runId) {
     let lastSave = 0;
     let pending = null;
     const persistRun = () => {
-      if (stopped(runId)) return;
+      if (pending) return;
       const now = Date.now();
-      if (now - lastSave < 400) {
-        if (!pending) pending = setTimeout(() => { pending = null; persistRun(); }, 400 - (now - lastSave));
-        return;
-      }
-      lastSave = now;
-      writing = writing.then(() => {
-        if (!stopped(runId)) save(run);
-      }).catch((e) => console.error('save failed', e));
+      const wait = Math.max(0, 400 - (now - lastSave));
+      pending = setTimeout(() => {
+        pending = null;
+        lastSave = Date.now();
+        writing = writing.then(async () => {
+          if (!(await stopped(runId))) await save(run);
+        }).catch((e) => console.error('save failed', e));
+      }, wait);
     };
 
-    await mapPool(tasks, config.pageConcurrency, async ({ page, vp }) => {
-      if (!stopped(runId)) await processViewport(run, page, vp);
+    const concurrency = run.input?.publicCaller
+      ? Math.min(config.pageConcurrency, config.publicPageConcurrency || 6)
+      : config.pageConcurrency;
+
+    await mapPool(tasks, concurrency, async ({ page, vp }) => {
+      if (!(await stopped(runId))) await processViewport(run, page, vp);
       const left = remaining.get(page) - 1;
       remaining.set(page, left);
       if (left === 0) {
@@ -130,21 +133,21 @@ export async function processRun(runId) {
     if (pending) clearTimeout(pending);
     await writing;
 
-    if (stopped(runId)) return;
+    if (await stopped(runId)) return;
     run.captureMs = Date.now() - captureStarted;
     run.summary = summarize(run);
     run.status = 'done';
     run.finishedAt = new Date().toISOString();
-    save(run);
+    await save(run);
     note(runId, 'done', seen);
     await finishRun(run);
   } catch (e) {
-    if (stopped(runId)) return;
+    if (await stopped(runId)) return;
     note(runId, 'failed', seen);
     run.status = 'failed';
     run.error = String(e.message || e);
     run.finishedAt = new Date().toISOString();
-    save(run);
+    await save(run);
     throw e;
   }
 }

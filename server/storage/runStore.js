@@ -1,6 +1,6 @@
 import { db } from './databaseAdapter.js';
 import { storage } from './storageAdapter.js';
-import { countActiveRuns as countActive } from './sqliteDb.js';
+import { countActiveRuns as countActive } from './db.js';
 
 export const runPath = (id) => storage.getRunDir(id);
 export const loadAll = () => db.loadAll();

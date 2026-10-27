@@ -3,6 +3,7 @@ data
 web/dist
 web/ui-shots
 .env
+settings.local.json
 .claude/settings.local.json
 .claude/worktrees/
 *.log

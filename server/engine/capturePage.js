@@ -33,8 +33,8 @@ export async function closeBrowser() {
   browserPromise = null;
 }
 
-async function autoScroll(page) {
-  await page.evaluate(async (budgetMs) => {
+async function autoScroll(page, budgetMs = 2500) {
+  await page.evaluate(async (budget) => {
     const start = performance.now();
     await new Promise((resolve) => {
       let y = 0;
@@ -42,14 +42,14 @@ async function autoScroll(page) {
       const t = setInterval(() => {
         scrollBy(0, step);
         y += step;
-        const timedOut = performance.now() - start > budgetMs;
+        const timedOut = performance.now() - start > budget;
         if (y >= document.documentElement.scrollHeight || y > 20000 || timedOut) {
           clearInterval(t);
           resolve();
         }
       }, 80);
     });
-  }, 2500);
+  }, budgetMs);
   await page.evaluate(() => scrollTo(0, 0));
 }
 
@@ -57,9 +57,13 @@ async function autoScroll(page) {
  * Capture one page at one viewport in a fresh, isolated context.
  * Returns { shotFile (absolute), violations, metrics }.
  */
-export async function capturePage(url, vp, outFile, { collectLeads = false, deterministic = false } = {}) {
+export async function capturePage(url, vp, outFile, {
+  collectLeads = false, deterministic = false, fast = false,
+} = {}) {
   const browser = await getBrowser();
   const context = await browser.newContext(contextOptions(vp));
+  const scrollBudget = fast ? 1200 : 2500;
+  const fontCap = fast ? 800 : 1500;
   try {
     if (deterministic) {
       await context.addInitScript(() => {
@@ -75,6 +79,13 @@ export async function capturePage(url, vp, outFile, { collectLeads = false, dete
       });
     }
     const page = await context.newPage();
+    await page.route('**/*', async (route) => {
+      if (route.request().resourceType() === 'document') {
+        try { await assertPublicUrl(route.request().url(), 'nav'); }
+        catch { return route.abort('blockedbyclient'); }
+      }
+      return route.continue();
+    });
     const mark = () => Date.now();
     let t = mark();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: config.navTimeoutMs });
@@ -83,16 +94,16 @@ export async function capturePage(url, vp, outFile, { collectLeads = false, dete
     const idleMs = 0;
     await page.addStyleTag({ content: FREEZE_CSS });
     t = mark();
-    await autoScroll(page);
+    await autoScroll(page, scrollBudget);
     const scrollMs = mark() - t;
     t = mark();
-    const fontWait = await page.evaluate(() => Promise.race([
+    const fontWait = await page.evaluate((cap) => Promise.race([
       (document.fonts?.ready || Promise.resolve()).then(() => 'ready'),
-      new Promise((resolve) => setTimeout(() => resolve('cap'), 1500)),
-    ]));
+      new Promise((resolve) => setTimeout(() => resolve('cap'), cap)),
+    ]), fontCap);
     const fontMs = mark() - t;
     const partial = fontWait === 'cap';
-    await page.waitForTimeout(100);
+    if (!fast) await page.waitForTimeout(50);
 
     const result = await page.evaluate(evaluate, { touch: vp.touch, viewportWidth: vp.width });
     const leadHtml = collectLeads
