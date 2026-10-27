@@ -10,7 +10,8 @@
     "dev:web": "vite web",
     "build:web": "vite build web",
     "preview:web": "vite preview web",
-    "test": "node --test server/test/*.test.js"
+    "test": "node --test server/test/*.test.js",
+    "test:ui": "node web/uiLayout.mjs"
   },
   "engines": {
     "node": ">=20"

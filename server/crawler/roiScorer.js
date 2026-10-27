@@ -11,8 +11,10 @@ const HIGH_ROI_PATTERNS = [
   { pattern: /\b(checkout|cart|basket|order|pay)\b/i, score: 45, label: 'checkout' },
   { pattern: /\b(dashboard|app|portal|console)\b/i, score: 40, label: 'app' },
   { pattern: /\b(features|product|solutions|services)\b/i, score: 35, label: 'features' },
-  { pattern: /\b(contact|support|help|faq)\b/i, score: 30, label: 'contact' },
-  { pattern: /\b(about|team|company|careers)\b/i, score: 25, label: 'about' },
+  { pattern: /\b(contact|support|help|faq)\b/i, score: 40, label: 'contact' },
+  { pattern: /\b(team|people|staff)\b/i, score: 40, label: 'team' },
+  { pattern: /\b(book|booking|demo|schedule)\b/i, score: 40, label: 'book' },
+  { pattern: /\b(about|company|careers)\b/i, score: 25, label: 'about' },
   { pattern: /\b(docs|documentation|guide|api)\b/i, score: 25, label: 'docs' },
 ];
 
@@ -103,5 +105,13 @@ export function selectTopRoiCandidates(urls, maxCount) {
   }));
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, maxCount).map((item) => item.url);
+  const picked = [];
+  const take = (item) => {
+    if (item && !picked.includes(item) && picked.length < maxCount) picked.push(item);
+  };
+  take(scored.find((s) => s.labels.includes('homepage') || s.labels.includes('root')));
+  const leadPages = scored.filter((s) => s.labels.some((l) => l === 'contact' || l === 'team' || l === 'book'));
+  take(leadPages[0]);
+  for (const item of scored) take(item);
+  return picked.map((item) => item.url);
 }

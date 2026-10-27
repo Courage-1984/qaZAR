@@ -21,6 +21,7 @@
   </header>
   <main class="container">
     <section class="hero">
+      <p class="kicker">Seven viewports · one gradient</p>
       <h1>Viewport QA, <span class="grad">pixel-perfect.</span></h1>
       <p class="lead">Crawl a site across 7 viewports, catch UX/UI violations and visual regressions.</p>
     </section>
@@ -37,11 +38,11 @@
         <input id="sitemap_url" name="sitemap_url" type="url" placeholder="https://example.com/sitemap.xml">
         <label for="max_pages">Max pages <span class="muted">(used when no specific pages are listed)</span></label>
         <input id="max_pages" name="max_pages" type="number" min="1" max="200" value="10">
-        <div class="row checkbox-row" style="margin: 1rem 0; display: flex; align-items: center; gap: 0.5rem;">
+        <div class="checkbox-row">
           <input id="render_js" name="render_js" type="checkbox">
-          <label for="render_js" style="margin: 0; cursor: pointer; font-size: 0.9rem;">Headless JS Crawl <span class="muted">(for SPAs &amp; dynamic links)</span></label>
+          <label for="render_js">Headless JS Crawl <span class="muted">(for SPAs &amp; dynamic links)</span></label>
         </div>
-        <button id="submit" class="btn primary" type="submit">Run QA</button>
+        <button id="submit" class="btn primary block" type="submit">Run QA</button>
         <p id="msg" class="msg" role="status" aria-live="polite"></p>
       </form>
     </section>

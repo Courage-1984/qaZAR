@@ -6,9 +6,11 @@ import { buildQueue } from '../crawler/crawl.js';
 import { slugFor } from '../crawler/normalize.js';
 import { scoreUrl } from '../crawler/roiScorer.js';
 import { capturePage, VIEWPORTS } from '../engine/capturePage.js';
+import { absorbRendered } from '../crawler/absorb.js';
 import { baselinePath, hasBaseline, promote } from '../visual/baseline.js';
 import { diffImages } from '../visual/diff.js';
-import { getRun, runPath, save } from '../storage/runStore.js';
+import { getRun, runPath, removeRun, save } from '../storage/runStore.js';
+import { mapPool } from '../util/batch.js';
 
 const cancelled = new Set();
 export const cancelRun = (id) => cancelled.add(id);
@@ -17,15 +19,6 @@ export const cancelRun = (id) => cancelled.add(id);
 let chain = Promise.resolve();
 export function enqueue(runId) {
   chain = chain.then(() => processRun(runId)).catch((e) => console.error('run failed', e));
-}
-
-async function pool(items, n, fn) {
-  const it = items[Symbol.iterator]();
-  await Promise.all(
-    Array.from({ length: n }, async () => {
-      for (let r = it.next(); !r.done; r = it.next()) await fn(r.value);
-    }),
-  );
 }
 
 async function processViewport(run, page, vp) {
@@ -39,12 +32,16 @@ async function processViewport(run, page, vp) {
     let res;
     for (let attempt = 0; attempt < 2 && !res; attempt++) {
       try {
-        res = await capturePage(page.url, vp, abs);
+        res = await capturePage(page.url, vp, abs, { collectLeads: vp.name === 'desktop' });
       } catch (e) {
         lastErr = e;
       }
     }
     if (!res) throw lastErr;
+    if (res.leadHtml && run.siteProfile) {
+      absorbRendered(run.siteProfile, res.leadHtml, page.url);
+      delete res.leadHtml;
+    }
     rec.shot = rel.replaceAll('\\', '/');
     rec.violations = res.violations;
     rec.metrics = res.metrics;
@@ -186,26 +183,53 @@ export async function processRun(runId) {
         viewports: {},
       };
     });
-    run.progress = { pagesDone: 0, pagesTotal: urls.length };
+    run.progress = { pagesDone: 0, pagesTotal: urls.length, capturesDone: 0, capturesTotal: urls.length * VIEWPORTS.length };
     run.status = 'capturing';
     save(run);
 
-    await pool(run.pages, config.pageConcurrency, async (page) => {
-      for (const vp of VIEWPORTS) {
-        if (cancelled.has(runId)) return;
-        await processViewport(run, page, vp);
-        save(run);
+    const tasks = run.pages.flatMap((page) => VIEWPORTS.map((vp) => ({ page, vp })));
+    const remaining = new Map(run.pages.map((page) => [page, VIEWPORTS.length]));
+    let writing = Promise.resolve();
+    let lastSave = 0;
+    let pending = null;
+    const persistRun = () => {
+      const now = Date.now();
+      if (now - lastSave < 400) {
+        if (!pending) pending = setTimeout(() => { pending = null; persistRun(); }, 400 - (now - lastSave));
+        return;
       }
-      evaluateCrossViewport(page);
-      run.progress.pagesDone++;
-      save(run);
-    });
+      lastSave = now;
+      writing = writing.then(() => {
+        if (getRun(runId)) save(run);
+      }).catch((e) => console.error('save failed', e));
+    };
 
+    await mapPool(tasks, config.pageConcurrency, async ({ page, vp }) => {
+      if (!cancelled.has(runId) && getRun(runId)) await processViewport(run, page, vp);
+      const left = remaining.get(page) - 1;
+      remaining.set(page, left);
+      if (left === 0) {
+        evaluateCrossViewport(page);
+        run.progress.pagesDone++;
+      }
+      run.progress.capturesDone++;
+      persistRun();
+    });
+    if (pending) clearTimeout(pending);
+    await writing;
+
+    if (!getRun(runId)) return;
     run.summary = summarize(run);
     run.status = cancelled.has(runId) ? 'cancelled' : 'done';
   } catch (e) {
+    if (!getRun(runId)) return;
     run.status = 'failed';
     run.error = String(e.message || e);
+  } finally {
+    if (!getRun(runId)) {
+      removeRun(runId);
+      return;
+    }
   }
   run.finishedAt = new Date().toISOString();
   save(run);

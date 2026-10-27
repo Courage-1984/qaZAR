@@ -1,46 +1,83 @@
 /**
  * Lightweight robots.txt parser for polite crawler compliance.
+ * Consecutive User-agent lines form one group. Allow wins on an equal or longer match.
  */
+
+function applies(ua) {
+  const name = String(ua).toLowerCase();
+  return name === '*' || name.includes('qazar');
+}
+
+function pathMatches(path, rule) {
+  if (!rule) return false;
+  if (rule === '/') return true;
+  return path.startsWith(rule);
+}
 
 export function parseRobotsTxt(content = '') {
   const disallows = [];
+  const allows = [];
   const sitemaps = [];
   let crawlDelay = 0;
-  let isTargetAgent = false;
+  let agents = [];
+  let inRules = false;
 
-  for (const rawLine of content.split('\n')) {
+  for (const rawLine of String(content).split('\n')) {
     const line = rawLine.split('#')[0].trim();
-    if (!line) continue;
-
-    const [key, ...vals] = line.split(':');
-    const field = key.trim().toLowerCase();
-    const val = vals.join(':').trim();
+    if (!line) {
+      agents = [];
+      inRules = false;
+      continue;
+    }
+    const idx = line.indexOf(':');
+    if (idx < 0) continue;
+    const field = line.slice(0, idx).trim().toLowerCase();
+    const val = line.slice(idx + 1).trim();
 
     if (field === 'user-agent') {
-      const ua = val.toLowerCase();
-      isTargetAgent = ua === '*' || ua.includes('qazar');
-    } else if (field === 'disallow' && isTargetAgent) {
-      if (val) disallows.push(val);
-    } else if (field === 'crawl-delay' && isTargetAgent) {
-      const d = parseFloat(val);
-      if (!isNaN(d)) crawlDelay = d;
+      if (inRules) agents = [];
+      inRules = false;
+      agents.push(val);
     } else if (field === 'sitemap') {
-      sitemaps.push(val);
+      if (val) sitemaps.push(val);
+    } else if (field === 'disallow' || field === 'allow' || field === 'crawl-delay') {
+      inRules = true;
+      if (!agents.some(applies)) continue;
+      if (field === 'disallow' && val) disallows.push(val);
+      else if (field === 'allow' && val) allows.push(val);
+      else if (field === 'crawl-delay') {
+        const d = Number.parseFloat(val);
+        if (!Number.isNaN(d)) crawlDelay = d;
+      }
     }
   }
 
-  return { disallows, sitemaps, crawlDelay };
+  return { disallows, allows, sitemaps, crawlDelay };
 }
 
-export function isUrlAllowed(urlStr, disallows = []) {
-  if (!disallows.length) return true;
+export function isUrlAllowed(urlStr, rules = []) {
+  const disallows = Array.isArray(rules) ? rules : rules.disallows || [];
+  const allows = Array.isArray(rules) ? [] : rules.allows || [];
+  if (!disallows.length && !allows.length) return true;
+  let path;
   try {
-    const path = new URL(urlStr).pathname;
-    return !disallows.some((disallow) => {
-      if (disallow === '/') return true;
-      return path.startsWith(disallow);
-    });
+    path = new URL(urlStr).pathname;
   } catch {
     return true;
   }
+  let bestLen = -1;
+  let allowed = true;
+  for (const rule of disallows) {
+    if (pathMatches(path, rule) && rule.length > bestLen) {
+      bestLen = rule.length;
+      allowed = false;
+    }
+  }
+  for (const rule of allows) {
+    if (pathMatches(path, rule) && rule.length >= bestLen) {
+      bestLen = rule.length;
+      allowed = true;
+    }
+  }
+  return allowed;
 }

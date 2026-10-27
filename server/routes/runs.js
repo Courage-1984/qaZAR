@@ -5,7 +5,6 @@ import { cancelRun, enqueue } from '../queue/jobQueue.js';
 import { promoteRun } from '../visual/baseline.js';
 import { validateRunInput } from './validate.js';
 import { generateExecutiveReport } from '../report/reportGenerator.js';
-import { calculateHealthScore } from '../report/scoreCalculator.js';
 
 export const runsRouter = Router();
 
@@ -32,20 +31,6 @@ runsRouter.get('/:id/report', (req, res) => {
   if (!run) return res.status(404).json({ error: 'Run not found' });
   const leadEmail = req.query.email || 'consulting@qazar.dev';
   const agency = req.query.agency || req.query.brand || null;
-
-  if (req.query.format === 'json' || req.query.json === '1') {
-    const health = calculateHealthScore(run);
-    return res.json({
-      runId: run.id,
-      domain: run.input?.domain,
-      createdAt: run.createdAt,
-      agency: agency || 'qaZAR Executive Audit',
-      health,
-      siteProfile: run.siteProfile || null,
-      summary: run.summary || null,
-    });
-  }
-
   const html = generateExecutiveReport(run, leadEmail, { agency });
   if (req.query.download === '1') {
     const safeDomain = run.input?.domain?.replace(/https?:\/\//, '').replace(/[^a-zA-Z0-9.-]/g, '_') || run.id;

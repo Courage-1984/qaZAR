@@ -1,5 +1,7 @@
 import { calculateHealthScore } from './scoreCalculator.js';
 import { getReportStyles } from './reportStyles.js';
+import { renderSeoSection } from './seoSection.js';
+import { renderLeadSection } from './leadSection.js';
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
@@ -40,13 +42,14 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev',
   <style>${getReportStyles(gradeColor)}</style>
 </head>
 <body>
+  <div class="bg-glow" aria-hidden="true"></div>
   <div class="wrapper">
     <div class="header">
       <div>
         <div class="brand">${esc(agency)}</div>
-        <div style="font-size: 0.9rem; color: var(--muted); margin-top: 4px;">Target: <b>${esc(domain)}</b></div>
+        <div class="muted">Target: <b>${esc(domain)}</b></div>
       </div>
-      <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <div class="actions">
         <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
         <button class="btn-print" onclick="navigator.clipboard.writeText(document.getElementById('summary-md').textContent).then(()=>alert('Executive summary copied!'))">📋 Copy Summary</button>
         <span class="badge-report">${esc(dateStr)}</span>
@@ -65,14 +68,16 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev',
       </div>
     </section>
 
+    ${renderLeadSection(run.siteProfile)}
+
     <div class="grid">
       <div class="card">
         <h3>Critical Defect Patterns</h3>
-        <div class="val" style="color: #ef4444;">${metrics.distinctErrors} <small style="font-size:0.85rem;color:var(--muted);font-weight:400;">(${metrics.rawErrors} raw)</small></div>
+        <div class="val bad">${metrics.distinctErrors} <small class="muted">(${metrics.rawErrors} raw)</small></div>
       </div>
       <div class="card">
         <h3>Systemic Global Issues</h3>
-        <div class="val" style="color: #f59e0b;">${metrics.globalDefects} <small style="font-size:0.85rem;color:var(--muted);font-weight:400;">site-wide</small></div>
+        <div class="val warn">${metrics.globalDefects} <small class="muted">site-wide</small></div>
       </div>
       <div class="card">
         <h3>Mobile Risk Score</h3>
@@ -102,9 +107,9 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev',
         <div class="risk-desc">Text elements failing WCAG AA contrast ratios (4.5:1) expose digital properties to European and US accessibility liability (ADA/EAA).</div>
       </div>` : ''}
       ${(metrics.categories.mobileTouch === 0 && metrics.categories.overflowBreakage === 0 && metrics.categories.wcagContrast === 0) ? `
-      <div style="background: var(--card); border: 1px solid var(--border); border-left: 4px solid #10b981; padding: 1rem; border-radius: 0 8px 8px 0;">
-        <div style="font-weight: 600; color: #10b981;">✓ High Structural &amp; Layout Health</div>
-        <div style="font-size: 0.85rem; color: var(--muted); margin-top: 2px;">Zero critical layout collisions, horizontal overflows, or accessibility contrast violations detected.</div>
+      <div class="risk-item">
+        <div class="risk-title ok">✓ High Structural &amp; Layout Health</div>
+        <div class="risk-desc">Zero critical layout collisions, horizontal overflows, or accessibility contrast violations detected.</div>
       </div>` : ''}
     </section>
 
@@ -114,7 +119,7 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev',
       <div class="grid" style="margin-bottom: 1rem;">
         <div class="card">
           <h3>Server Latency</h3>
-          <div class="val" style="${run.siteProfile.avgResponseTimeMs > 1000 ? 'color: #ef4444;' : 'color: #10b981;'}">${run.siteProfile.avgResponseTimeMs}ms</div>
+          <div class="val ${run.siteProfile.avgResponseTimeMs > 1000 ? 'bad' : 'ok'}">${run.siteProfile.avgResponseTimeMs}ms</div>
         </div>
         <div class="card">
           <h3>Detected Stack</h3>
@@ -122,7 +127,7 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev',
         </div>
         <div class="card">
           <h3>Security &amp; Trust</h3>
-          <div class="val" style="font-size: 1rem; ${run.siteProfile.security?.score < 80 ? 'color: #ef4444;' : 'color: #10b981;'}">${run.siteProfile.security?.score || 100}/100 <small style="font-size: 0.75rem; display:block; color:var(--muted);">${esc(run.siteProfile.security?.flags?.join(', ') || '✓ Transport Protected')}</small></div>
+          <div class="val ${run.siteProfile.security?.score < 80 ? 'bad' : 'ok'}">${run.siteProfile.security?.score || 100}/100 <small class="muted">${esc(run.siteProfile.security?.flags?.join(', ') || '✓ Transport Protected')}</small></div>
         </div>
         <div class="card">
           <h3>Asset &amp; Script Hygiene</h3>
@@ -140,22 +145,23 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev',
         <div class="card">
           <h3>SEO &amp; Brand Previews</h3>
           <div class="val" style="font-size: 0.95rem;">
-            ${run.siteProfile.socialSharing?.hasOpenGraph ? '<span style="color:#10b981;">✓ Rich OpenGraph Cards</span>' : '<span style="color:#f59e0b;">⚠️ Missing og:image Card</span>'}
-            <small style="font-size: 0.75rem; display: block; color: var(--muted);">${run.siteProfile.socialSharing?.hasCanonical ? '✓ Canonical' : '⚠️ No Canonical'} · ${run.siteProfile.crawlMeta?.hasRobotsTxt === false ? '⚠️ No Robots.txt' : '✓ Robots.txt'}</small>
+            ${run.siteProfile.socialSharing?.pageCount ? `<span>Open Graph ${run.siteProfile.socialSharing.openGraphPages || 0}/${run.siteProfile.socialSharing.pageCount}</span>` : (run.siteProfile.socialSharing?.hasOpenGraph ? '<span style="color:#10b981;">✓ Rich OpenGraph Cards</span>' : '<span style="color:#f59e0b;">⚠️ Missing og:image Card</span>')}
+            <small style="font-size: 0.75rem; display: block; color: var(--muted);">${run.siteProfile.socialSharing?.pageCount ? `Canonical ${run.siteProfile.socialSharing.canonicalPages || 0}/${run.siteProfile.socialSharing.pageCount}` : (run.siteProfile.socialSharing?.hasCanonical ? '✓ Canonical' : '⚠️ No Canonical')} · ${run.siteProfile.crawlMeta?.hasRobotsTxt === false ? '⚠️ No Robots.txt' : '✓ Robots.txt'}</small>
           </div>
         </div>
       </div>
     </section>` : ''}
+    ${renderSeoSection(run.siteProfile)}
 
     ${topClusters.length ? `
     <section class="impact-section">
       <h2>Consolidated Defect Evidence (${metrics.distinctErrors} Distinct Issues Across ${metrics.totalPages} Pages)</h2>
       <div style="font-size: 0.85rem; color: var(--muted); margin-bottom: 0.75rem;">Repetitive cross-device duplicates clustered to highlight systemic layout bugs without noise.</div>
       ${topClusters.map((c) => `
-        <div style="background: var(--card); border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 0.5rem; font-size: 0.85rem;">
-          <div style="display:flex; justify-content:space-between; margin-bottom:0.25rem;">
-            <b style="color: ${c.severity === 'error' ? '#ef4444' : '#f59e0b'};">${c.isGlobal ? '🌐 SITE-WIDE' : '📄 PAGE'}: ${esc(c.rule)}</b>
-            <span style="color:var(--muted); font-size:0.75rem;">${c.totalOccurrences}&times; in ${c.viewports.length} viewports (${esc(c.viewports.join(', '))})</span>
+        <div class="cluster">
+          <div class="split">
+            <b class="${c.severity === 'error' ? 'bad' : 'warn'}">${c.isGlobal ? '🌐 SITE-WIDE' : '📄 PAGE'}: ${esc(c.rule)}</b>
+            <span class="meta">${c.totalOccurrences}&times; in ${c.viewports.length} viewports (${esc(c.viewports.join(', '))})</span>
           </div>
           <div style="color: var(--text);">${esc(c.detail)}</div>
           ${c.selector ? `<div style="color:var(--muted); font-family:monospace; font-size:0.75rem; margin-top:0.25rem;">${esc(c.selector)}</div>` : ''}
@@ -167,16 +173,16 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev',
     <section class="impact-section">
       <h2>Prioritized Implementation Roadmap</h2>
       <div class="grid" style="margin-bottom:0;">
-        <div class="card" style="border-top:3px solid #10b981;">
-          <h3 style="color:#10b981;">Tier 1 · Quick Wins</h3>
+        <div class="card tier-ok">
+          <h3 class="ok">Tier 1 · Quick Wins</h3>
           ${roadmap.quickWins.map((w) => `<div style="font-size:0.85rem; margin-bottom:0.35rem;">⚡ ${esc(w)}</div>`).join('') || '<div style="font-size:0.85rem; color:var(--muted);">✓ No quick blockers.</div>'}
         </div>
-        <div class="card" style="border-top:3px solid #f59e0b;">
-          <h3 style="color:#f59e0b;">Tier 2 · UX &amp; Accessibility</h3>
+        <div class="card tier-warn">
+          <h3 class="warn">Tier 2 · UX &amp; Accessibility</h3>
           ${roadmap.coreUx.map((u) => `<div style="font-size:0.85rem; margin-bottom:0.35rem;">🛠️ ${esc(u)}</div>`).join('') || '<div style="font-size:0.85rem; color:var(--muted);">✓ Layout compliant.</div>'}
         </div>
-        <div class="card" style="border-top:3px solid #6366f1;">
-          <h3 style="color:#818cf8;">Tier 3 · Strategic Architecture</h3>
+        <div class="card tier-accent">
+          <h3>Tier 3 · Strategic Architecture</h3>
           ${roadmap.strategic.map((s) => `<div style="font-size:0.85rem; margin-bottom:0.35rem;">🏛️ ${esc(s)}</div>`).join('') || '<div style="font-size:0.85rem; color:var(--muted);">✓ Sound architecture.</div>'}
         </div>
       </div>
@@ -185,8 +191,8 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev',
     ${roiAssessment ? `
     <section class="impact-section">
       <h2>Engineering Remediation vs. Rebuild Assessment</h2>
-      <div class="card" style="border-left: 4px solid ${roiAssessment.recommendationType === 'rebuild' ? '#a855f7' : '#10b981'};">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+      <div class="card reco">
+        <div class="split">
           <div>
             <div style="font-size:0.75rem; text-transform:uppercase; color:var(--muted); letter-spacing:0.05em;">Strategic Recommendation</div>
             <div style="font-size:1.2rem; font-weight:700; color:#fff;">${esc(roiAssessment.recommendationTitle)}</div>
@@ -200,16 +206,6 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev',
       </div>
     </section>` : ''}
 
-    ${(run.siteProfile?.leadContacts?.emails?.length || run.siteProfile?.leadContacts?.phones?.length || run.siteProfile?.leadContacts?.socials?.length) ? `
-    <section class="impact-section">
-      <h2>Verified Domain Ownership &amp; Key Contacts</h2>
-      <div class="card" style="display:flex; flex-wrap:wrap; gap:1.5rem; align-items:center;">
-        ${(run.siteProfile.leadContacts.emails || []).map((e) => `<div><span style="color:var(--muted); font-size:0.75rem; text-transform:uppercase; display:block;">Email</span><b>${esc(e)}</b></div>`).join('')}
-        ${(run.siteProfile.leadContacts.phones || []).map((p) => `<div><span style="color:var(--muted); font-size:0.75rem; text-transform:uppercase; display:block;">Phone</span><b>${esc(p)}</b></div>`).join('')}
-        ${(run.siteProfile.leadContacts.socials || []).map((s) => `<div><span style="color:var(--muted); font-size:0.75rem; text-transform:uppercase; display:block;">Social / Profile</span><a href="${esc(s)}" target="_blank" rel="noopener" style="color:var(--accent); text-decoration:none;">${esc(s)}</a></div>`).join('')}
-      </div>
-    </section>` : ''}
-
     <section class="cta-card">
       <h2>Turn Audit Findings Into High-Converting UX</h2>
       <p>Remediate responsive breakage, eliminate accessibility compliance liabilities, or discuss a modern, high-performance website rebuild engineered to pass 100% of multi-viewport tests.</p>
@@ -218,12 +214,12 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev',
 
     <div class="footer">Generated by ${esc(agency)} &bull; Automated 7-Viewport Quality Assurance Suite</div>
   </div>
-  <script type="text/plain" id="summary-md"># ${agency}: ${domain}
-Score: ${score}/100 (Grade ${grade}) – ${status}
+  <script type="text/plain" id="summary-md"># ${esc(agency)}: ${esc(domain)}
+Score: ${score}/100 (Grade ${esc(grade)}) – ${esc(status)}
 Pages Tested: ${metrics.totalPages} (${metrics.totalCaptures} captures across 7 devices)
 Defects: ${metrics.distinctErrors} distinct clusters (${metrics.globalDefects} site-wide)
-Dev Effort: ~${roiAssessment?.estimatedHours || 0}h (${roiAssessment?.recommendationTitle || ''})
-Report ID: ${run.id}</script>
+Dev Effort: ~${roiAssessment?.estimatedHours || 0}h (${esc(roiAssessment?.recommendationTitle || '')})
+Report ID: ${esc(run.id)}</script>
 </body>
 </html>`;
 }

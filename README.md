@@ -65,7 +65,8 @@ The engine injects evaluations into the DOM on every viewport and flags:
 Environment variables:
 - `PORT`: API port (default: 8787)
 - `DATA_DIR`: Directory for runs & baselines (default: `server/../data`)
-- `PAGE_CONCURRENCY`: Parallel page processing (default: 2)
+- `PAGE_CONCURRENCY`: Simultaneous captures, page by viewport (default: 4)
+- `CRAWL_CONCURRENCY`: Simultaneous discovery fetches (default: 6)
 - `ALLOW_PRIVATE=1`: Allow localhost or private IP targets (disabled by default to prevent SSRF)
 
 ## Documentation

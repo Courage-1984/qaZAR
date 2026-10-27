@@ -1,4 +1,4 @@
-import { api, getApiBase, setApiBase } from './api.js';
+import { api, bindNavApi, getApiBase, setApiBase } from './api.js';
 
 const $ = (id) => document.getElementById(id);
 const msg = $('msg');
@@ -9,6 +9,7 @@ async function showConnected(base) {
   apiStatus.textContent = '✓ Connected to ' + base;
   apiStatus.className = 'msg ok';
   $('api_base').value = base;
+  bindNavApi();
 }
 
 async function testApi() {
@@ -29,6 +30,7 @@ async function testApi() {
   }
 }
 testApi();
+bindNavApi();
 
 $('api-save').addEventListener('click', () => {
   setApiBase($('api_base').value || getApiBase());

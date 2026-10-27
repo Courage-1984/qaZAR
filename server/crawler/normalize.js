@@ -21,6 +21,13 @@ export function normalizeUrl(raw, base) {
 
 export const isAssetUrl = (url) => ASSET.test(new URL(url).pathname);
 export const sameOrigin = (a, b) => new URL(a).origin === new URL(b).origin;
+export const sameHost = (a, b) => {
+  try {
+    return new URL(a).hostname.toLowerCase() === new URL(b).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+};
 
 /** Filesystem-safe, collision-resistant slug for a page URL. */
 export function slugFor(url) {

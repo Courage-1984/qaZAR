@@ -16,6 +16,11 @@ export async function extractLinksHeadless(url, timeoutMs = 20000) {
 
   const links = new Set();
   try {
+    await context.route('**/*', (route) => {
+      const type = route.request().resourceType();
+      if (type === 'image' || type === 'media' || type === 'font') return route.abort();
+      return route.continue();
+    });
     const page = await context.newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});

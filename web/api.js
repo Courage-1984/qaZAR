@@ -151,10 +151,24 @@ export const api = {
   artifact: (runId, rel) => `${getApiBase()}/api/artifacts/${encodeURIComponent(runId)}/${rel.split('/').map(encodeURIComponent).join('/')}`,
   eventsUrl: (id) => `${getApiBase()}/api/runs/${encodeURIComponent(id)}/events`,
   reportUrl: (id, opts = {}) => {
-    const p = typeof opts === 'boolean' ? (opts ? { download: '1' } : {}) : { ...opts };
+    const raw = typeof opts === 'boolean' ? (opts ? { download: '1' } : {}) : opts;
+    const p = Object.fromEntries(Object.entries(raw).filter(([, v]) => v != null && v !== ''));
     const q = new URLSearchParams(p).toString();
     return `${getApiBase()}/api/runs/${encodeURIComponent(id)}/report${q ? '?' + q : ''}`;
   },
 };
+
+/** Keep the public API address on the header links so a copied GitHub Pages URL still connects. */
+export function bindNavApi() {
+  const base = getApiBase();
+  if (!base) return;
+  for (const a of document.querySelectorAll('nav a[href]')) {
+    const href = a.getAttribute('href');
+    if (!href || /^https?:/i.test(href)) continue;
+    const u = new URL(href, location.href);
+    u.searchParams.set('api', base);
+    a.setAttribute('href', `${u.pathname.split('/').pop()}${u.search}`);
+  }
+}
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);

@@ -66,5 +66,6 @@ server {
 |---|---|---|
 | `PORT` | `8787` | API server listen port |
 | `DATA_DIR` | `./data` | Directory for runs, baselines, and diffs |
-| `PAGE_CONCURRENCY` | `2` | Simultaneous pages processed per run |
+| `PAGE_CONCURRENCY` | `4` | Simultaneous captures (page × viewport) per run |
+| `CRAWL_CONCURRENCY` | `6` | Simultaneous discovery fetches |
 | `ALLOW_PRIVATE` | `0` | Set `1` only in local fixture testing |

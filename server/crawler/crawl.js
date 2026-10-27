@@ -1,9 +1,13 @@
-import { normalizeUrl, isAssetUrl, sameOrigin } from './normalize.js';
+import { normalizeUrl, isAssetUrl, sameOrigin, sameHost } from './normalize.js';
 import { collectSitemapUrls, discoverSitemaps } from './sitemap.js';
 import { extractLinksHeadless } from './headlessCrawl.js';
 import { selectTopRoiCandidates } from './roiScorer.js';
 import { extractCrawlSignals, aggregateSiteProfile } from './siteProfiler.js';
+import { summarizeSeo } from './seo.js';
 import { parseRobotsTxt, isUrlAllowed } from './robots.js';
+import { fetchPublic, fetchPublicText, readCapped } from './safeFetch.js';
+import { config } from '../config.js';
+import { drainWaves } from '../util/batch.js';
 
 /** Extract same-origin hrefs from HTML (regex; fast for static discovery). */
 export function extractLinks(html, baseUrl) {
@@ -19,43 +23,51 @@ export function extractLinks(html, baseUrl) {
  * Breadth-first crawl from a starting URL.
  * Extracts lightweight performance, tech stack, and lead signals on the fly.
  */
-async function bfs(start, max, { renderJs = false, onProgress, disallows = [] } = {}) {
+async function bfs(start, max, { renderJs = false, onProgress, robotRules = { disallows: [], allows: [] }, concurrency = config.crawlConcurrency } = {}) {
   const seen = new Set([start]);
   const queue = [start];
   const discovered = [];
   const pageSignals = [];
   const brokenLinks = [];
+  const limit = max * 2;
+  let headlessActive = 0;
+  const headlessWait = [];
   onProgress?.('crawling:bfs', `Discovered 1 URL (${start})`);
 
-  while (queue.length && discovered.length < max * 2) {
-    const url = queue.shift();
+  const runHeadless = async (url) => {
+    if (headlessActive >= 2) await new Promise((resolve) => headlessWait.push(resolve));
+    headlessActive++;
+    try {
+      return await extractLinksHeadless(url).catch(() => []);
+    } finally {
+      headlessActive--;
+      headlessWait.shift()?.();
+    }
+  };
+
+  await drainWaves(queue, concurrency, async (url) => {
+    if (discovered.length >= limit) return;
     try {
       let links = [];
       const t0 = performance.now();
-      const res = await fetch(url, {
-        headers: { 'user-agent': 'qaZAR/0.1' },
-        signal: AbortSignal.timeout(15000),
-      });
+      const res = await fetchPublic(url, { timeout: 15000, label: 'page' });
       const elapsed = Math.round(performance.now() - t0);
 
       if (res.ok && (res.headers.get('content-type') || '').includes('html')) {
         discovered.push(url);
         onProgress?.('crawling:bfs', `Discovered ${discovered.length} pages (${url})`);
-        const html = await res.text();
+        const html = (await readCapped(res)).toString('utf8');
         pageSignals.push(extractCrawlSignals(html, url, elapsed, res.headers));
         links = extractLinks(html, url);
-
-        // If static extraction found no links on start page, or renderJs requested -> try headless
         if ((renderJs || (url === start && links.length === 0)) && links.length < 3) {
-          const jsLinks = await extractLinksHeadless(url).catch(() => []);
-          links = [...new Set([...links, ...jsLinks])];
+          links = [...new Set([...links, ...(await runHeadless(url))])];
         }
       } else if (!res.ok && res.status >= 400) {
         brokenLinks.push({ url, status: res.status });
       }
 
       for (const l of links) {
-        if (!seen.has(l) && isUrlAllowed(l, disallows)) {
+        if (!seen.has(l) && isUrlAllowed(l, robotRules)) {
           seen.add(l);
           queue.push(l);
         }
@@ -63,31 +75,48 @@ async function bfs(start, max, { renderJs = false, onProgress, disallows = [] } 
     } catch {
       /* skip unreachable */
     }
-  }
+  }, () => discovered.length < limit);
 
   onProgress?.('crawling:prioritizing', `Scoring ROI across ${discovered.length} candidates...`);
   const urls = selectTopRoiCandidates(discovered, max);
   onProgress?.('crawling:profiling', `Aggregating site tech & lead profile...`);
   const siteProfile = aggregateSiteProfile(pageSignals, brokenLinks);
+  const selected = new Set(urls);
+  siteProfile.seo = summarizeSeo(
+    pageSignals.filter((s) => selected.has(s.url)).map((s) => s.seo),
+    robotRules,
+  );
   return { urls, siteProfile };
 }
 
-async function profilePage(url) {
-  const pageSignals = [];
+async function loadRobots(origin) {
   try {
-    const t0 = performance.now();
-    const res = await fetch(url, {
-      headers: { 'user-agent': 'qaZAR/0.1' },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (res.ok) {
-      const html = await res.text();
-      pageSignals.push(extractCrawlSignals(html, url, Math.round(performance.now() - t0), res.headers));
-    }
+    const { text } = await fetchPublicText(`${origin}/robots.txt`, { timeout: 5000, label: 'robots' });
+    const parsed = parseRobotsTxt(text);
+    return { hasRobotsTxt: true, robotRules: { disallows: parsed.disallows, allows: parsed.allows } };
   } catch {
-    /* skip unreachable profile target */
+    return { hasRobotsTxt: false, robotRules: { disallows: [], allows: [] } };
   }
-  return aggregateSiteProfile(pageSignals);
+}
+
+function emptyProfile(crawlMeta) {
+  return {
+    avgResponseTimeMs: 0,
+    hasMissingViewportMeta: false,
+    techStack: [],
+    leadContacts: { emails: [], phones: [], socials: [], contacts: [] },
+    companyName: '',
+    bookingLinks: [],
+    leadHeat: 0,
+    seoScore: 100,
+    security: { isHttps: true, score: 100, flags: [] },
+    assetHygiene: { uncompressedCount: 0, unlazyImagesTotal: 0, blockingScriptsTotal: 0, webFontsTotal: 0 },
+    codeHygiene: { legacyTagsTotal: 0, missingAltImagesTotal: 0, hasFavicon: true },
+    socialSharing: { hasOpenGraph: false, hasCanonical: false, openGraphPages: 0, canonicalPages: 0, pageCount: 0 },
+    funnel: { hasPricing: false, hasCheckout: false, hasAuth: false, hasContact: false, hasLeadForm: false, insecureFormsCount: 0, brokenLinks: [] },
+    seo: null,
+    crawlMeta,
+  };
 }
 
 /**
@@ -97,30 +126,17 @@ async function profilePage(url) {
  */
 export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs = false, pages = null, onProgress }) {
   const start = normalizeUrl(domain);
+  const origin = new URL(start).origin;
+  const { hasRobotsTxt, robotRules } = await loadRobots(origin);
+
   if (pages?.length) {
     const urls = pages.slice(0, max_pages);
     const noun = urls.length === 1 ? 'page' : 'pages';
     onProgress?.('crawling:pages', `Limiting crawl to ${urls.length} submitted ${noun}`);
-    const siteProfile = await profilePage(urls[0]);
-    siteProfile.crawlMeta = { hasRobotsTxt: false, hasSitemap: false, explicitPages: true };
+    onProgress?.('crawling:profiling', `Contacts will be read during desktop capture of ${urls.length} ${noun}`);
+    const siteProfile = emptyProfile({ hasRobotsTxt, hasSitemap: false, explicitPages: true });
+    siteProfile.crawlMeta = { hasRobotsTxt, hasSitemap: false, explicitPages: true };
     return { urls, source: 'pages', siteProfile };
-  }
-  const origin = new URL(start).origin;
-
-  let disallows = [];
-  let hasRobotsTxt = false;
-  try {
-    const robotsRes = await fetch(`${origin}/robots.txt`, {
-      headers: { 'user-agent': 'qaZAR/0.1' },
-      signal: AbortSignal.timeout(5000),
-    });
-    if (robotsRes.ok) {
-      hasRobotsTxt = true;
-      const robotsTxt = await robotsRes.text();
-      disallows = parseRobotsTxt(robotsTxt).disallows || [];
-    }
-  } catch {
-    /* no robots.txt */
   }
 
   onProgress?.('crawling:sitemap', `Discovering sitemaps for ${domain}...`);
@@ -129,25 +145,25 @@ export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs
 
   for (const s of candidates) {
     try {
-      sitemapUrls.push(...(await collectSitemapUrls(s, max_pages * 2)));
+      sitemapUrls.push(...(await collectSitemapUrls(s, max_pages * 2, new Set(), config.crawlConcurrency, origin)));
     } catch {
       /* try next */
     }
     if (sitemapUrls.length >= max_pages * 2) break;
   }
 
-  const uniq = [...new Set(sitemapUrls)].filter((u) => isUrlAllowed(u, disallows));
+  const uniq = [...new Set(sitemapUrls)].filter((u) => sameHost(u, start) && isUrlAllowed(u, robotRules));
   if (uniq.length) {
     onProgress?.('crawling:prioritizing', `Prioritizing top ${max_pages} ROI URLs from sitemap...`);
     const prioritized = selectTopRoiCandidates(uniq, max_pages);
-    onProgress?.('crawling:profiling', `Profiling ${start} infrastructure & leads...`);
-    const siteProfile = await profilePage(start);
+    onProgress?.('crawling:profiling', `Contacts will be read during desktop capture`);
+    const siteProfile = emptyProfile({ hasRobotsTxt, hasSitemap: true });
     siteProfile.crawlMeta = { hasRobotsTxt, hasSitemap: true };
     return { urls: prioritized, source: 'sitemap', siteProfile };
   }
 
   onProgress?.('crawling:bfs', `Starting BFS discovery crawl on ${start}...`);
-  const { urls, siteProfile } = await bfs(start, max_pages, { renderJs, onProgress, disallows });
+  const { urls, siteProfile } = await bfs(start, max_pages, { renderJs, onProgress, robotRules });
   siteProfile.crawlMeta = { hasRobotsTxt, hasSitemap: false };
   return { urls: urls.length ? urls : [start], source: 'crawl', siteProfile };
 }

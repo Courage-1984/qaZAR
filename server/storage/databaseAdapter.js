@@ -72,6 +72,7 @@ class JsonDatabaseAdapter {
   }
 
   save(run) {
+    if (!this.runs.has(run.id)) return;
     storage.writeArtifact(run.id, 'run.json', JSON.stringify(run, null, 2));
     this.broadcast(run.id, {
       status: run.status,
@@ -81,9 +82,9 @@ class JsonDatabaseAdapter {
   }
 
   delete(id, { ownerId = null } = {}) {
-    const run = this.get(id, { ownerId });
-    if (!run) return false;
-    this.runs.delete(id);
+    const run = this.runs.get(id);
+    if (run && ownerId && run.ownerId !== ownerId) return false;
+    if (run) this.runs.delete(id);
     storage.deleteRunArtifacts(id);
     this.events.delete(id);
     return true;

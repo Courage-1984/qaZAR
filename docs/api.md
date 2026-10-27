@@ -26,10 +26,12 @@ Submit a new site for QA testing.
   {
     "domain": "https://example.com",
     "sitemap_url": "https://example.com/sitemap.xml",
+    "pages": "/pricing\n/about",
     "max_pages": 10,
     "renderJs": false
   }
   ```
+When `pages` is set (one path or URL per line, or an array), the crawl stays on that list and ignores the sitemap. `max_pages` applies only when `pages` is empty.
 - **Response**: `202 Accepted`
   ```json
   {
@@ -45,13 +47,12 @@ Retrieve detailed run metadata, viewport results, violation details, and visual 
 
 ### `GET /api/runs/:id/events`
 Server-Sent Events (SSE) live progress stream.
-- Connects client for real-time progress updates without polling.
-- Emits heartbeat ping (`: keep-alive\n\n`) every 15s to keep proxy connections alive.
+- Sends a snapshot every 2 seconds. The results page also polls, because some proxies buffer the stream.
 - Event payload:
   ```json
   {
     "status": "capturing",
-    "progress": { "pagesDone": 2, "pagesTotal": 5 },
+    "progress": { "pagesDone": 1, "pagesTotal": 5, "capturesDone": 4, "capturesTotal": 35 },
     "summary": null
   }
   ```
@@ -65,9 +66,8 @@ Promote run captures to baseline.
 Cancel an active run and delete its artifacts.
 
 ### `GET /api/runs/:id/report`
-Generates a client-ready quality assessment report or JSON health summary.
+Generates a client-ready HTML quality assessment report.
 - **Query Parameters**:
-  - `format=json`: Returns machine-readable JSON containing score, grade, clusters, dev effort estimation (`roiAssessment`), 3-tier roadmap, and tech stack profile.
   - `email=agency@dev.com`: Customizes the recipient email in the lead generation CTA.
   - `agency=Apex+Advisory`: Customizes the agency / consultant brand in header, footer, and lead CTA.
   - `download=1`: Sets `Content-Disposition: attachment` to trigger automatic browser file download.
@@ -78,6 +78,7 @@ Generates a client-ready quality assessment report or JSON health summary.
   - 3-tier actionable implementation roadmap (Quick Wins, Core UX, Strategic Architecture).
   - Print/PDF export stylesheet with page-break protection.
   - One-click pre-formatted Markdown clipboard summary for Slack/Jira.
+  - Public lead summary (heat, contacts, roles, booking links). Rules: [leads.md](leads.md). There is no JSON report.
 
 
 ## Artifacts Endpoint

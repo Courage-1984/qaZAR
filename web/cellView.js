@@ -1,10 +1,11 @@
 import { api, esc } from './api.js';
 
 export function cellInfo(rec) {
-  if (!rec) return { cls: 'pending', label: '…' };
+  if (!rec || rec.status === 'pending') return { cls: 'pending', label: '…' };
   if (rec.status === 'error') return { cls: 'error', label: 'ERR' };
-  const errs = rec.violations.filter((v) => v.severity === 'error').length;
-  const warns = rec.violations.filter((v) => v.severity === 'warn').length;
+  const violations = rec.violations || [];
+  const errs = violations.filter((v) => v.severity === 'error').length;
+  const warns = violations.filter((v) => v.severity === 'warn').length;
   let cls = errs ? 'error' : warns ? 'warn' : 'ok';
   if (rec.status === 'changed') cls += ' changed';
   const label = `${errs ? errs + 'E ' : ''}${warns ? warns + 'W' : ''}`.trim() || '✓';
@@ -17,7 +18,7 @@ export function renderCell(run, selected) {
   const el = document.getElementById('detail');
   if (!rec) return;
   const img = (rel, label) => rel ? `<figure><figcaption>${label}</figcaption><a href="${api.artifact(run.id, rel)}" target="_blank" rel="noopener"><img loading="lazy" alt="${label}" src="${api.artifact(run.id, rel)}"></a></figure>` : '';
-  const v = rec.violations
+  const v = (rec.violations || [])
     .map((x) => `<tr><td><span class="badge ${x.severity}">${esc(x.severity)}</span></td><td><code>${esc(x.rule)}</code></td><td>${esc(x.detail)}<div class="muted sm mono">${esc(x.selector || '')}${x.rect ? ` · 📐 ${x.rect.w}×${x.rect.h} @ (${x.rect.x},${x.rect.y})` : ''}</div></td></tr>`)
     .join('');
   el.innerHTML = `<div class="card" id="cell-detail"><h2>${esc(new URL(page.url).pathname)} · ${esc(selected.vp)}</h2>

@@ -3,13 +3,27 @@ import net from 'node:net';
 import { config } from '../config.js';
 import { resolveExplicitPages } from '../crawler/explicitPages.js';
 
-function isPrivateIp(ip) {
-  if (net.isIPv4(ip)) {
-    const [a, b] = ip.split('.').map(Number);
+/** Last 32 bits of a dotted or hex IPv4 embedded in ::ffff: or 64:ff9b::. */
+function embeddedIpv4(host) {
+  const h = String(host).toLowerCase().replace(/^\[|\]$/g, '');
+  if (net.isIPv4(h)) return h;
+  const dotted = h.match(/^(?:::ffff:|64:ff9b::)(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (dotted && net.isIPv4(dotted[1])) return dotted[1];
+  const hex = h.match(/^(?:::ffff:|64:ff9b::)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (!hex) return null;
+  const hi = Number.parseInt(hex[1], 16);
+  const lo = Number.parseInt(hex[2], 16);
+  return `${(hi >> 8) & 255}.${hi & 255}.${(lo >> 8) & 255}.${lo & 255}`;
+}
+
+export function isPrivateIp(ip) {
+  const v4 = embeddedIpv4(ip);
+  if (v4) {
+    const [a, b] = v4.split('.').map(Number);
     return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
   }
-  const l = ip.toLowerCase();
-  return l === '::1' || l === '::' || l.startsWith('fc') || l.startsWith('fd') || l.startsWith('fe80') || l.startsWith('::ffff:127.') || l.startsWith('::ffff:10.') || l.startsWith('::ffff:192.168.');
+  const l = String(ip).toLowerCase();
+  return l === '::1' || l === '::' || l.startsWith('fc') || l.startsWith('fd') || l.startsWith('fe80');
 }
 
 /** Throws if URL is not http(s) or resolves to a private address (SSRF guard). */

@@ -151,6 +151,10 @@ export function generateActionRoadmap(run, categories = {}, clusters = []) {
   if (p.codeHygiene && !p.codeHygiene.hasFavicon) quickWins.push('Add high-resolution favicon and Apple touch icon for branded browser tabs.');
   if (p.crawlMeta && !p.crawlMeta.hasRobotsTxt) quickWins.push('Add standard robots.txt to guide search crawlers and protect server bandwidth.');
   if (p.crawlMeta && !p.crawlMeta.hasSitemap) quickWins.push('Generate and submit XML sitemap (sitemap.xml) for search engine indexing.');
+  const seoIds = new Set((p.seo?.issues || []).map((i) => i.id));
+  if (seoIds.has('seo-noindex') || seoIds.has('seo-robots-disallow')) quickWins.push('Remove noindex or robots.txt blocks on pages that should appear in search.');
+  if (seoIds.has('seo-missing-title')) quickWins.push('Write a unique title element for every page that is missing one.');
+  if (seoIds.has('seo-duplicate-title')) quickWins.push('Give each page its own title so search results are not identical.');
 
   if (categories.mobileTouch > 0) coreUx.push(`Enlarge ${categories.mobileTouch} touch target(s) to meet the 48x48px accessibility minimum.`);
   if (categories.overflowBreakage > 0) coreUx.push(`Constrain ${categories.overflowBreakage} layout element(s) causing horizontal viewport overflow.`);

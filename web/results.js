@@ -1,5 +1,6 @@
-import { api, esc, getApiBase } from './api.js';
+import { api, bindNavApi, esc, getApiBase } from './api.js';
 import { cellInfo, renderCell } from './cellView.js';
+import { renderRunList } from './listView.js';
 
 const app = document.getElementById('app');
 const VPS = ['ultrawide', 'fhd', 'macbook', 'desktop', 'laptop', 'tablet', 'mobile'];
@@ -15,6 +16,15 @@ let timer;
 let selected = null; // {slug, vp}
 
 const fmtDate = (s) => new Date(s).toLocaleString();
+function leadSummary(profile) {
+  if (!profile?.leadContacts) return '';
+  const heat = Number.isFinite(profile.leadHeat) ? `<div>🔥 <b>${profile.leadHeat}</b> lead heat</div>` : '';
+  const people = (profile.leadContacts.contacts || []).filter((c) => c.kind === 'email' || c.kind === 'phone').slice(0, 2);
+  const shown = people.length ? people : (profile.leadContacts.emails || []).slice(0, 2).map((value) => ({ value, role: '' }));
+  const who = shown.map((c) => esc(c.role ? `${c.role}: ${c.value}` : c.value)).join(' · ');
+  const book = profile.bookingLinks?.[0] ? `<div>📅 <b>${esc(profile.bookingLinks[0])}</b></div>` : '';
+  return `${heat}${who ? `<div>✉️ <b>${who}</b></div>` : ''}${book}`;
+}
 const fail = (e) => {
   app.innerHTML = `<h1>Results</h1><div class="card"><p class="msg bad">${esc(e.message)}</p>
     <p class="muted">Check the API base URL on the <a href="${samePage('./index.html')}">Submit</a> page, or auto-detect below.</p>
@@ -37,20 +47,7 @@ async function renderList() {
   try {
     const runs = await api.listRuns();
     if (!Array.isArray(runs)) throw new Error('The API did not return a run list.');
-    app.innerHTML = `<h1>Results</h1>
-      <div class="card"><table class="tbl" id="runs-table"><thead><tr><th>Run</th><th>Domain</th><th>Status</th><th>Pages</th><th>Errors</th><th>Changed</th><th></th></tr></thead><tbody>
-      ${runs.map((r) => `<tr>
-        <td><a href="${samePage(`?id=${encodeURIComponent(r.id)}`)}">${esc(r.id)}</a><div class="muted sm">${esc(fmtDate(r.createdAt))}</div></td>
-        <td>${esc(r.input.domain)}</td>
-        <td><span class="badge ${esc(r.status)}">${esc(r.status)}</span></td>
-        <td>${r.progress.pagesDone}/${r.progress.pagesTotal}</td>
-        <td>${r.summary ? r.summary.violations.error : '–'}</td>
-        <td>${r.summary ? r.summary.changed : '–'}</td>
-        <td>
-          <a class="btn sm" href="${api.reportUrl(r.id, true)}" download title="Download Executive Report">Report</a>
-          <button class="btn sm danger" data-del="${esc(r.id)}" aria-label="Delete run ${esc(r.id)}">Delete</button>
-        </td></tr>`).join('') || `<tr><td colspan="7" class="muted">No runs yet. <a href="${samePage('./index.html')}">Start one</a>.</td></tr>`}
-      </tbody></table></div>`;
+    app.innerHTML = renderRunList(runs, samePage, fmtDate);
     app.querySelectorAll('[data-del]').forEach((b) =>
       b.addEventListener('click', async () => {
         if (confirm('Delete this run?')) {
@@ -83,7 +80,7 @@ function renderDetail(run) {
 
   const rows = filtered
     .map(
-      (p) => `<tr><td class="url"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(new URL(p.url).pathname + new URL(p.url).search)}</a>${p.roi ? `<span class="badge" style="font-size:0.7rem; margin-left:0.4rem; background:rgba(99,102,241,0.15); color:#818cf8;">${esc(p.roi.label)} · ${p.roi.score}pts</span>` : ''}</td>
+      (p) => `<tr><td class="url"><a class="hit" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(new URL(p.url).pathname + new URL(p.url).search)}</a>${p.roi ? `<span class="badge roi">${esc(p.roi.label)} · ${p.roi.score}pts</span>` : ''}</td>
       ${VPS.map((vp) => {
         const rec = p.viewports?.[vp];
         const c = cellInfo(rec);
@@ -96,8 +93,10 @@ function renderDetail(run) {
   const liveBadge = active && streamState === 'sse' ? ' · 🟢 Live SSE' : active && streamState === 'poll' ? ' · 🟡 Polling' : '';
   const statusLabel = run.status === 'done' ? '✓ Complete' : run.status;
   const savedAgency = localStorage.getItem('qazar.agency') || '';
+  const seo = run.siteProfile?.seo;
+  const seoIssue = seo?.issues?.find((i) => i.severity === 'error' || i.severity === 'warn');
   app.innerHTML = `
-    <p><a href="${samePage('./results.html')}">← All runs</a></p>
+    <p><a class="hit" href="${samePage('./results.html')}">← All runs</a></p>
     <h1>${esc(run.input.domain)}</h1>
     ${run.input.pages?.length ? `<p class="muted sm">Crawl limited to ${run.input.pages.length} submitted page${run.input.pages.length === 1 ? '' : 's'}.</p>` : ''}
     <div class="stats">
@@ -106,43 +105,41 @@ function renderDetail(run) {
       ${s ? `<div class="stat"><b>${s.violations.error}</b><small>errors</small></div><div class="stat"><b>${s.violations.warn}</b><small>warnings</small></div><div class="stat"><b>${s.changed}</b><small>visual changes</small></div><div class="stat"><b>${s.new}</b><small>new baselines</small></div>` : ''}
     </div>
     ${run.siteProfile ? `
-      <div class="card" style="margin-bottom: 1rem; padding: 0.75rem 1rem;">
-        <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-bottom: 0.25rem;">Crawl &amp; Lead Intelligence</div>
-        <div class="row" style="gap: 1.5rem; flex-wrap: wrap; font-size: 0.85rem;">
+      <div class="card">
+        <div class="kicker">Crawl &amp; lead intelligence</div>
+        <div class="chips">
           <div>⏱️ <b>${run.siteProfile.avgResponseTimeMs}ms</b> latency</div>
           <div>🛠️ <b>${esc((run.siteProfile.techStack || []).join(', ') || 'Custom')}</b></div>
           <div>📱 <b>${run.siteProfile.hasMissingViewportMeta ? '⚠️ Missing Viewport' : '✓ Viewport Meta'}</b></div>
           <div>🎯 <b>${[run.siteProfile.funnel?.hasPricing ? 'Pricing' : null, run.siteProfile.funnel?.hasCheckout ? 'Checkout' : null, run.siteProfile.funnel?.hasContact ? 'Contact' : null].filter(Boolean).join(' · ') || 'Brochureware'}</b></div>
-          ${run.siteProfile.assetHygiene?.blockingScriptsTotal ? `<div style="color:#f59e0b;">⚠️ <b>${run.siteProfile.assetHygiene.blockingScriptsTotal} Blocking Script(s)</b></div>` : ''}
-          ${run.siteProfile.funnel?.brokenLinks?.length ? `<div style="color:#ef4444;">🚨 <b>${run.siteProfile.funnel.brokenLinks.length} Broken Link(s)</b></div>` : ''}
-          ${run.siteProfile.leadContacts?.emails?.length ? `<div>✉️ <b>${esc(run.siteProfile.leadContacts.emails[0])}</b></div>` : ''}
+          ${run.siteProfile.assetHygiene?.blockingScriptsTotal ? `<div class="warn">⚠️ <b>${run.siteProfile.assetHygiene.blockingScriptsTotal} Blocking Script(s)</b></div>` : ''}
+          ${run.siteProfile.funnel?.brokenLinks?.length ? `<div class="bad">🚨 <b>${run.siteProfile.funnel.brokenLinks.length} Broken Link(s)</b></div>` : ''}
+          ${leadSummary(run.siteProfile)}
+          ${seo ? `<div>🔎 <b>${esc(String(seo.score))}/100</b> search${seoIssue ? ` · ${esc(seoIssue.detail.slice(0, 80))}` : ''}</div>` : ''}
         </div>
       </div>
     ` : ''}
-    <div class="row" style="margin: 1rem 0; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
-      <input type="text" id="agency-name" placeholder="Brand / Agency (optional)" value="${esc(savedAgency)}" style="padding:0.4rem 0.6rem; border-radius:6px; background:var(--card); border:1px solid var(--border); color:#fff; font-size:0.85rem; width:180px;" title="Whitelabel brand for executive report">
-      <a class="btn primary" id="btn-download-report" href="${api.reportUrl(run.id, { download: '1', agency: savedAgency || undefined })}" download>📥 Download Executive Report</a>
-      <a class="btn" id="btn-view-report" href="${api.reportUrl(run.id, { agency: savedAgency || undefined })}" target="_blank" rel="noopener">👁️ View Report</a>
-      <a class="btn" href="${api.reportUrl(run.id, { format: 'json' })}" target="_blank" rel="noopener">{ } JSON Summary</a>
-      ${run.status === 'done' ? '<button class="btn" id="promote-all">Set all captures as baseline</button>' : ''}
+    ${run.status === 'done' ? `<div class="row toolbar">
+      <input class="field" type="text" id="agency-name" placeholder="Brand / Agency (optional)" value="${esc(savedAgency)}" title="Whitelabel brand for executive report">
+      <a class="btn primary" id="btn-download-report" href="${api.reportUrl(run.id, { download: '1', agency: savedAgency || undefined })}" download>Download report</a>
+      <a class="btn" id="btn-view-report" href="${api.reportUrl(run.id, { agency: savedAgency || undefined })}" target="_blank" rel="noopener">View report</a>
+      <button class="btn" id="promote-all">Set all captures as baseline</button>
     </div>
-    ${run.status === 'done' ? `
-      <div class="card" style="border: 1px solid rgba(99,102,241,0.3); background: rgba(99,102,241,0.06); margin-bottom: 1.5rem;">
-        <h3 style="color: #818cf8; margin-bottom: 0.25rem;">Turn Audit Findings Into High-Converting UX</h3>
-        <p class="muted sm" style="margin-bottom: 0.75rem;">Download the executive report above for a client-ready assessment, or request a complete code remediation plan to resolve all mobile and accessibility defects.</p>
-        <a class="btn sm primary" href="${api.reportUrl(run.id, { agency: savedAgency || undefined })}" target="_blank">View Client-Ready Executive Report →</a>
-      </div>
-    ` : ''}
+      <div class="card cta">
+        <h3>Turn audit findings into high-converting UX</h3>
+        <p class="muted sm">Open the executive report for a client-ready assessment, or request a remediation plan for the mobile and accessibility defects.</p>
+        <a class="btn primary" href="${api.reportUrl(run.id, { agency: savedAgency || undefined })}" target="_blank">View executive report</a>
+      </div>` : ''}
     ${run.error ? `<p class="msg bad">${esc(run.error)}</p>` : ''}
     ${run.status === 'crawling' && run.crawlMessage ? `<p class="muted">${esc(run.crawlMessage)}</p>` : ''}
-    ${active ? '<div class="bar"><i style="width:' + (run.progress.pagesTotal ? Math.round((run.progress.pagesDone / run.progress.pagesTotal) * 100) : 8) + '%"></i></div>' : ''}
+    ${active ? '<div class="bar"><i style="width:' + (run.progress.capturesTotal ? Math.round(((run.progress.capturesDone || 0) / run.progress.capturesTotal) * 100) : 8) + '%"></i></div>' : ''}
     ${run.pages.length ? `
-      <div class="row" style="margin:1rem 0 0.5rem 0; gap:0.5rem; align-items:center; flex-wrap:wrap;">
-        <input type="search" id="page-search" placeholder="Search pages..." value="${esc(query)}" style="padding:0.35rem 0.6rem; border-radius:6px; background:var(--card); border:1px solid var(--border); color:#fff; font-size:0.85rem; width:180px;">
-        <div style="display:flex; gap:0.3rem;">
-          ${['all', 'error', 'warn', 'changed'].map((f) => `<button class="btn sm ${filter === f ? 'primary' : ''}" data-filter="${f}">${f.toUpperCase()}</button>`).join('')}
+      <div class="toolbar">
+        <input class="field" type="search" id="page-search" placeholder="Search pages..." value="${esc(query)}">
+        <div class="filters">
+          ${['all', 'error', 'warn', 'changed'].map((f) => `<button class="btn ${filter === f ? 'primary' : ''}" data-filter="${f}">${f.toUpperCase()}</button>`).join('')}
         </div>
-        <small class="muted" style="margin-left:auto;">Showing ${filtered.length}/${run.pages.length} pages</small>
+        <small class="muted">Showing ${filtered.length}/${run.pages.length} pages</small>
       </div>
       <div class="card scroll"><table class="tbl matrix" id="matrix"><thead><tr><th>Page</th>${VPS.map((v) => `<th>${v}</th>`).join('')}</tr></thead><tbody>${rows || '<tr><td colspan="8" class="muted">No pages match filter.</td></tr>'}</tbody></table>
       <p class="muted sm">E = errors, W = warnings, dashed outline = visual change vs baseline. Click a cell for details.</p></div>` : ''}
@@ -233,4 +230,5 @@ async function startWatching() {
 
 if (id) startWatching();
 else renderList();
+bindNavApi();
 

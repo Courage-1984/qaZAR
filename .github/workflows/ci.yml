@@ -32,3 +32,11 @@ jobs:
         run: npm test
       - name: Web UI Build
         run: npm run build:web
+      - name: UI layout across 7 viewports
+        run: npm run test:ui
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-shots
+          path: web/ui-shots
+          if-no-files-found: ignore

@@ -66,7 +66,7 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 ### 9. Crawler & Report Iteration with MVP Progress Markers (Completed)
 - [x] Granular crawl progress markers streamed over SSE (`crawling:sitemap`, `crawling:bfs`, `crawling:profiling`, `crawling:prioritizing`).
 - [x] Expose ROI score breakdown and commercial weight factors in UI run view (page tags e.g. `pricing · 95pts`).
-- [x] Exportable JSON summary (`?format=json`) and customizable lead capture agency email (`?email=`) in report generator.
+- [x] HTML executive report with a customizable agency email (`?email=`). The JSON summary export was removed.
 - [x] Automatic stale process detection and auto-termination on port 8787 upon server start (`server/freePort.js`).
 
 ### 10. High-ROI Report Intelligence & Noise Elimination (Completed)
@@ -118,7 +118,7 @@ This file tracks active engineering tasks and milestones across the qaZAR develo
 - [x] Stream state tracking across EventSource lifecycle and automatic fallback polling.
 
 ### 21. Report API Specifications & Multi-Format Documentation (Completed)
-- [x] Documented JSON executive report schema (`GET /api/runs/:id/report?format=json`) in `docs/api.md`.
+- [x] Report query parameters documented in `docs/api.md`. The JSON report format was removed.
 - [x] Documented lead capture customization (`?email=`) and automated download parameters (`?download=1`).
 
 ### 22. Verified Domain Ownership & Lead Contact Dossier (Completed)

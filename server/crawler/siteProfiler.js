@@ -2,6 +2,8 @@
  * Lightweight, zero-overhead site profiler for extracting high-value ROI signals,
  * tech debt, and hot lead contact data directly during crawl time.
  */
+import { extractPageSeo } from './seo.js';
+import { extractLeads, scoreLeadHeat } from './leads.js';
 
 /**
  * Extracts metadata, tech stack clues, performance signals, and public contact info from HTML.
@@ -101,36 +103,12 @@ export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, hea
   }
   signals.techStack = [...tech];
 
-  // 3. Hot Lead Contact Extraction
-  const emails = new Set();
-  for (const m of html.matchAll(/mailto:([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi)) {
-    const email = m[1].toLowerCase();
-    if (!email.includes('example') && !email.includes('sentry') && !email.endsWith('.png')) {
-      emails.add(email);
-    }
-  }
-  // Fallback direct regex for email patterns in text
-  if (emails.size === 0) {
-    const rawMatches = html.match(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b/g) || [];
-    for (const e of rawMatches.slice(0, 3)) {
-      if (!e.includes('example') && !e.includes('schema.org') && !e.includes('w3.org')) {
-        emails.add(e.toLowerCase());
-      }
-    }
-  }
-  signals.contacts.emails = [...emails].slice(0, 5);
-
-  const phones = new Set();
-  for (const m of html.matchAll(/tel:([+\d\s().-]{7,})/gi)) {
-    phones.add(m[1].trim());
-  }
-  signals.contacts.phones = [...phones].slice(0, 3);
-
-  const socials = new Set();
-  for (const m of html.matchAll(/href\s*=\s*["'](https?:\/\/(?:www\.)?(?:linkedin\.com|twitter\.com|x\.com|github\.com|instagram\.com)\/[^"'\s>]+)["']/gi)) {
-    socials.add(m[1]);
-  }
-  signals.contacts.socials = [...socials].slice(0, 4);
+  const leads = extractLeads(html, url);
+  signals.leads = leads;
+  signals.contacts.emails = leads.emails;
+  signals.contacts.phones = leads.phones;
+  signals.contacts.socials = leads.socials;
+  signals.seo = extractPageSeo(html, url, headers);
 
   return signals;
 }
@@ -145,12 +123,14 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
     avgResponseTimeMs: 0,
     hasMissingViewportMeta: false,
     detectedTech: new Set(),
-    leadContacts: { emails: new Set(), phones: new Set(), socials: new Set() },
+    leadContacts: { emails: new Set(), phones: new Set(), socials: new Set(), contacts: [] },
+    companyName: '',
+    bookingLinks: new Set(),
     seoScore: 100,
     security: { isHttps: true, hasHsts: true, hasCsp: true, score: 100, flags: [] },
     assetHygiene: { uncompressedCount: 0, unlazyImagesTotal: 0, blockingScriptsTotal: 0, webFontsTotal: 0 },
     codeHygiene: { legacyTagsTotal: 0, missingAltImagesTotal: 0, hasFavicon: true },
-    socialSharing: { hasOpenGraph: true, hasCanonical: true },
+    socialSharing: { hasOpenGraph: true, hasCanonical: true, openGraphPages: 0, canonicalPages: 0, pageCount: 0 },
     funnel: {
       hasPricing: false,
       hasCheckout: false,
@@ -172,11 +152,19 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
     (s.contacts?.emails || []).forEach((e) => profile.leadContacts.emails.add(e));
     (s.contacts?.phones || []).forEach((p) => profile.leadContacts.phones.add(p));
     (s.contacts?.socials || []).forEach((sc) => profile.leadContacts.socials.add(sc));
+    for (const contact of s.leads?.contacts || []) {
+      if (!profile.leadContacts.contacts.some((c) => c.kind === contact.kind && c.value === contact.value)) {
+        profile.leadContacts.contacts.push(contact);
+      }
+    }
+    if (!profile.companyName && s.leads?.companyName) profile.companyName = s.leads.companyName;
+    for (const link of s.leads?.bookingLinks || []) profile.bookingLinks.add(link);
 
     if (!s.hasTitle) profile.seoScore -= 10;
     if (!s.hasDescription) profile.seoScore -= 5;
-    if (!s.hasOpenGraph) { profile.seoScore -= 5; profile.socialSharing.hasOpenGraph = false; }
-    if (!s.hasCanonical) profile.socialSharing.hasCanonical = false;
+    if (!s.hasOpenGraph) profile.seoScore -= 5;
+    else profile.socialSharing.openGraphPages++;
+    if (s.hasCanonical) profile.socialSharing.canonicalPages++;
 
     if (s.security) {
       if (!s.security.isHttps) profile.security.isHttps = false;
@@ -216,6 +204,19 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
 
   profile.avgResponseTimeMs = Math.round(totalTime / pageSignals.length);
   profile.seoScore = Math.max(20, Math.min(100, profile.seoScore));
+  profile.socialSharing.hasOpenGraph = profile.socialSharing.openGraphPages > 0;
+  profile.socialSharing.hasCanonical = profile.socialSharing.canonicalPages > 0;
+  profile.socialSharing.pageCount = pageSignals.length;
+  const pages = pageSignals.map((s) => s.url || '');
+  const bookingLinks = [...profile.bookingLinks];
+  const leadHeat = scoreLeadHeat({
+    emails: [...profile.leadContacts.emails],
+    phones: [...profile.leadContacts.phones],
+    bookingLinks,
+    hasLeadForm: profile.funnel.hasLeadForm,
+    hasContact: pages.some((p) => /\/(contact|team|book(?:ing)?|demo)\b/i.test(p)),
+    hasPricing: profile.funnel.hasPricing || pages.some((p) => /\b(pricing|plans)\b/i.test(p)),
+  });
 
   return {
     avgResponseTimeMs: profile.avgResponseTimeMs,
@@ -225,7 +226,11 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
       emails: [...profile.leadContacts.emails],
       phones: [...profile.leadContacts.phones],
       socials: [...profile.leadContacts.socials],
+      contacts: profile.leadContacts.contacts,
     },
+    companyName: profile.companyName,
+    bookingLinks,
+    leadHeat,
     seoScore: profile.seoScore,
     security: {
       isHttps: profile.security.isHttps,
