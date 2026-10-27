@@ -7,6 +7,16 @@ import { enqueue } from './jobs.js';
 
 const BACKOFF = [60_000, 5 * 60_000, 15 * 60_000];
 
+export function emailErrorLine(err) {
+  return String(err?.message || err).split('\n')[0];
+}
+
+async function clearEmailError(run) {
+  if (!run.emailError) return;
+  run.emailError = null;
+  await save(run);
+}
+
 async function ensurePdf(run) {
   if (storage.hasArtifact(run.id, 'report.pdf')) return;
   const agency = process.env.AGENCY_INBOX || 'consulting@qazar.dev';
@@ -19,12 +29,9 @@ export async function finishRun(run) {
   try {
     await ensurePdf(run);
     await sendReport({ run });
-    if (run.emailError) {
-      run.emailError = null;
-      await save(run);
-    }
+    await clearEmailError(run);
   } catch (e) {
-    run.emailError = String(e.message || e).split('\n')[0];
+    run.emailError = emailErrorLine(e);
     await save(run);
     await enqueue(run.id, 'email', BACKOFF[0]);
   }
@@ -33,10 +40,7 @@ export async function finishRun(run) {
 export async function deliverMail(run) {
   await ensurePdf(run);
   await sendReport({ run });
-  if (run.emailError) {
-    run.emailError = null;
-    await save(run);
-  }
+  await clearEmailError(run);
 }
 
 export { BACKOFF };
