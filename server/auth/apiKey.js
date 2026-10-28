@@ -1,5 +1,13 @@
 import crypto from 'node:crypto';
 import { timingSafeEqual } from '../util/timingSafeEqual.js';
+import {
+  authViaCookie,
+  authViaKey,
+  authViaPages,
+  parseApiKeysList,
+  readBearerToken,
+  readNamedCookie,
+} from './keyParse.js';
 
 const COOKIE = 'qazar_session';
 
@@ -8,28 +16,9 @@ let cachedKeys = [];
 
 export function loadApiKeys(raw = process.env.QAZAR_API_KEYS || '') {
   if (raw === cachedRaw) return cachedKeys;
-  const keys = [];
-  for (const part of String(raw).split(',').map((s) => s.trim()).filter(Boolean)) {
-    const bits = part.split('.');
-    if (bits.length < 3) continue;
-    keys.push({
-      keyId: bits[0],
-      secret: bits.slice(1, -1).join('.'),
-      ownerId: bits[bits.length - 1],
-    });
-  }
   cachedRaw = raw;
-  cachedKeys = keys;
-  return keys;
-}
-
-function cookieValue(req) {
-  const header = req.get('cookie') || '';
-  for (const bit of header.split(';')) {
-    const [name, ...rest] = bit.trim().split('=');
-    if (name === COOKIE) return decodeURIComponent(rest.join('='));
-  }
-  return '';
+  cachedKeys = parseApiKeysList(raw);
+  return cachedKeys;
 }
 
 export function operatorToken(secret = process.env.QAZAR_OPERATOR_KEY || '') {
@@ -38,8 +27,7 @@ export function operatorToken(secret = process.env.QAZAR_OPERATOR_KEY || '') {
 }
 
 export function readBearer(req) {
-  const header = req.get('authorization') || '';
-  return header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  return readBearerToken(req.get('authorization') || '');
 }
 
 /**
@@ -52,20 +40,15 @@ export function attachAuth(req, res, next) {
   if (bearer) {
     const key = loadApiKeys().find((item) => timingSafeEqual(item.secret, bearer));
     if (!key) return res.status(401).json({ error: 'Unauthorized' });
-    req.auth = {
-      keyId: key.keyId,
-      ownerId: key.ownerId,
-      via: 'key',
-      publicCaller: key.ownerId !== 'operator',
-    };
+    req.auth = authViaKey(key);
     return next();
   }
-  const token = cookieValue(req);
+  const token = readNamedCookie(req.get('cookie') || '', COOKIE);
   if (token && timingSafeEqual(token, operatorToken())) {
-    req.auth = { keyId: 'operator', ownerId: 'operator', via: 'cookie', publicCaller: false };
+    req.auth = authViaCookie();
     return next();
   }
-  req.auth = { keyId: 'pages', ownerId: 'operator', via: 'pages', publicCaller: false };
+  req.auth = authViaPages();
   next();
 }
 
