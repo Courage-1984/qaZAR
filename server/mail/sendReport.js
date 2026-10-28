@@ -1,27 +1,11 @@
 import fs from 'node:fs';
 import { storage } from '../storage/storageAdapter.js';
+import { buildMailBodies, buildMailRequest, isMailConfigured } from './mailBodies.js';
 
 function pdfBase64(runId) {
   const file = storage.getArtifactPath(runId, 'report.pdf');
   if (!fs.existsSync(file)) return '';
   return fs.readFileSync(file).toString('base64');
-}
-
-function bodies(run, pdf) {
-  const domain = run.input?.domain || '';
-  const share = `/api/share/${run.shareToken}`;
-  const agency = [
-    `Audit finished for ${domain}.`,
-    `Share path: ${share}`,
-    run.summary ? `Captures: ${run.summary.captures}` : '',
-  ].filter(Boolean).join('\n');
-  const prospect = `Your qaZAR audit for ${domain} is attached.`;
-  return {
-    agency,
-    prospect,
-    filename: 'qaZAR-audit.pdf',
-    content: pdf,
-  };
 }
 
 async function post(url, headers, payload, fetchImpl) {
@@ -41,37 +25,32 @@ async function post(url, headers, payload, fetchImpl) {
 export async function sendReport({ run, fetchImpl = fetch }) {
   const toProspect = run.input?.prospectEmail || '';
   const agency = process.env.AGENCY_INBOX || '';
-  if (!process.env.MAIL_API_KEY || !process.env.MAIL_FROM) {
+  if (!isMailConfigured()) {
     if (toProspect) throw new Error('mail is not configured');
     return { skipped: true };
   }
   const content = pdfBase64(run.id);
   if (!content) throw new Error('report.pdf is missing');
-  const text = bodies(run, content);
+  const text = buildMailBodies(run);
   const from = process.env.MAIL_FROM;
   const provider = (process.env.MAIL_PROVIDER || 'resend').toLowerCase();
+  const replyTo = agency || from;
+  const subject = `qaZAR audit — ${run.input?.domain || run.id}`;
   const recipients = [agency, toProspect].filter(Boolean);
   for (const to of recipients) {
-    const copy = to === toProspect ? text.prospect : text.agency;
-    if (provider === 'postmark') {
-      await post('https://api.postmarkapp.com/email', { 'X-Postmark-Server-Token': process.env.MAIL_API_KEY }, {
-        From: from,
-        To: to,
-        ReplyTo: agency || from,
-        Subject: `qaZAR audit — ${run.input?.domain || run.id}`,
-        TextBody: copy,
-        Attachments: [{ Name: text.filename, Content: content, ContentType: 'application/pdf' }],
-      }, fetchImpl);
-    } else {
-      await post('https://api.resend.com/emails', { Authorization: `Bearer ${process.env.MAIL_API_KEY}` }, {
-        from,
-        to: [to],
-        reply_to: agency || from,
-        subject: `qaZAR audit — ${run.input?.domain || run.id}`,
-        text: copy,
-        attachments: [{ filename: text.filename, content }],
-      }, fetchImpl);
-    }
+    const body = to === toProspect ? text.prospect : text.agency;
+    const req = buildMailRequest({
+      provider,
+      from,
+      to,
+      replyTo,
+      subject,
+      body,
+      filename: text.filename,
+      content,
+      apiKey: process.env.MAIL_API_KEY,
+    });
+    await post(req.url, req.headers, req.payload, fetchImpl);
   }
   return { sent: recipients.length };
 }
