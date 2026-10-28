@@ -4,12 +4,11 @@ import { sendReport } from '../mail/sendReport.js';
 import { storage } from '../storage/storageAdapter.js';
 import { save } from '../storage/runStore.js';
 import { enqueue } from './jobs.js';
+import { firstLine as emailErrorLine } from '../util/firstLine.js';
 
 const BACKOFF = [60_000, 5 * 60_000, 15 * 60_000];
 
-export function emailErrorLine(err) {
-  return String(err?.message || err).split('\n')[0];
-}
+export { emailErrorLine };
 
 async function clearEmailError(run) {
   if (!run.emailError) return;

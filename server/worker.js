@@ -4,7 +4,7 @@ import {
 } from './queue/jobs.js';
 import { awaitDb, dbPath } from './storage/db.js';
 import { processRun } from './queue/jobQueue.js';
-import { deliverMail, BACKOFF } from './queue/finishRun.js';
+import { deliverMail, BACKOFF, emailErrorLine } from './queue/finishRun.js';
 import { getRun, save } from './storage/runStore.js';
 import { closeBrowser, getBrowser } from './engine/capturePage.js';
 import { pruneBaselines } from './quota/prune.js';
@@ -26,7 +26,7 @@ async function emailJob(job) {
   } catch (e) {
     const next = (job.attempts || 0) + 1;
     if (next >= 3) {
-      run.emailError = String(e.message || e).split('\n')[0];
+      run.emailError = emailErrorLine(e);
       await save(run);
       await complete(job.id);
       return;
@@ -56,7 +56,7 @@ async function tick() {
           const run = await getRun(job.run_id);
           if (run && run.status !== 'cancelled') {
             run.status = 'failed';
-            run.error = String(e.message || e).split('\n')[0];
+            run.error = emailErrorLine(e);
             await save(run);
           }
         }
