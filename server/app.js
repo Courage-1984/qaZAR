@@ -13,15 +13,7 @@ import { attachAuth, operatorToken, setOperatorCookie } from './auth/apiKey.js';
 import { accountHandler, checkoutHandler, webhookHandler } from './billing/stripeBilling.js';
 import { timingSafeEqual } from './util/timingSafeEqual.js';
 import { getLocalIp } from './util/localIp.js';
-
-function originAllowed(origin) {
-  if (!origin) return true;
-  let host = '';
-  try { host = new URL(origin).hostname; } catch { return false; }
-  if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('github.io')) return true;
-  if (host === 'logi-ink.co.za' || host.endsWith('.logi-ink.co.za')) return true;
-  return config.allowedOrigins.includes(origin);
-}
+import { originAllowed } from './util/originAllowed.js';
 
 const ipOf = (req) => ipKeyGenerator(req.ip || '127.0.0.1');
 const postsOnly = (req) => req.method !== 'POST';
