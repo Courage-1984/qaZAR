@@ -4,6 +4,8 @@
  * targets the highest-impact UX templates rather than duplicate/paginated content.
  */
 
+import { clusterAdjustment, depthAdjustment } from './roiDepth.js';
+
 const HIGH_ROI_PATTERNS = [
   { pattern: /^\/?$/, score: 100, label: 'homepage' },
   { pattern: /\b(pricing|plans|tier|billing|upgrade)\b/i, score: 50, label: 'pricing' },
@@ -42,20 +44,10 @@ export function scoreUrl(urlStr, seenPrefixes = new Map()) {
     const segments = pathname.split('/').filter(Boolean);
     const depth = segments.length;
 
-    // Depth scoring: shallow pages carry higher brand/layout significance
-    if (depth === 0) {
-      score += 50;
-      labels.push('root');
-    } else if (depth === 1) {
-      score += 20;
-    } else if (depth === 2) {
-      score += 10;
-    } else if (depth > 4) {
-      score -= (depth - 4) * 10;
-      labels.push('deep-path');
-    }
+    const depthAdj = depthAdjustment(depth);
+    score += depthAdj.delta;
+    labels.push(...depthAdj.labels);
 
-    // High ROI pattern matches
     for (const { pattern, score: bonus, label } of HIGH_ROI_PATTERNS) {
       if (pattern.test(pathname)) {
         score += bonus;
@@ -63,7 +55,6 @@ export function scoreUrl(urlStr, seenPrefixes = new Map()) {
       }
     }
 
-    // Penalties
     for (const { pattern, penalty, label } of PENALTY_PATTERNS) {
       if (pattern.test(pathname) || pattern.test(u.search)) {
         score += penalty;
@@ -71,14 +62,12 @@ export function scoreUrl(urlStr, seenPrefixes = new Map()) {
       }
     }
 
-    // Diversity penalty: avoid capturing 10 blog posts from the same /blog/ prefix
     if (depth >= 2) {
       const prefix = `/${segments[0]}/`;
       const count = seenPrefixes.get(prefix) || 0;
-      if (count > 0) {
-        score -= count * 15; // diminishing returns on repeated templates
-        labels.push(`cluster-${segments[0]}`);
-      }
+      const cluster = clusterAdjustment(count, segments[0]);
+      score += cluster.delta;
+      labels.push(...cluster.labels);
       seenPrefixes.set(prefix, count + 1);
     }
   } catch {
