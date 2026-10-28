@@ -4,51 +4,28 @@
  */
 
 import { isJunkEmail, phoneDigits, scoreLeadHeat } from './leadSignals.js';
-
-const ROLES = ['founder', 'sales', 'support', 'press'];
-const SOCIAL_HOSTS = ['linkedin.com', 'twitter.com', 'x.com', 'github.com', 'instagram.com'];
-const BOOKING = /https?:\/\/(?:[\w.-]+\.)?(?:calendly\.com|cal\.com|savvycal\.com|meetings\.hubspot\.com|hubspot\.com\/meetings)\/[^\s"'<>]+/gi;
-
-function decode(s) {
-  return String(s || '').replace(/&amp;/gi, '&').replace(/&#0?39;|&apos;/gi, "'").replace(/\s+/g, ' ').trim();
-}
+import {
+  BOOKING_RE,
+  ROLE_HINTS,
+  addUnique,
+  asStringList,
+  cleanSocial,
+  decodeLeadText,
+  pushContact,
+  roleNear,
+} from './leadParse.js';
 
 export function normalizePhone(raw) {
   return phoneDigits(raw);
 }
 
-function junkEmail(email) {
-  return isJunkEmail(email);
-}
-
 export { scoreLeadHeat };
-
-function roleNear(html, index) {
-  const slice = html.slice(Math.max(0, index - 180), index + 80).replace(/<[^>]+>/g, ' ').toLowerCase();
-  return ROLES.find((role) => slice.includes(role)) || '';
-}
-
-function pushContact(list, seen, contact) {
-  const key = `${contact.kind}:${contact.value.toLowerCase()}`;
-  if (!contact.value || list.length >= 12) return;
-  if (seen.has(key)) {
-    const prev = list.find((c) => `${c.kind}:${c.value.toLowerCase()}` === key);
-    if (prev && !prev.role && contact.role) prev.role = contact.role;
-    return;
-  }
-  seen.add(key);
-  list.push(contact);
-}
 
 function readJsonLd(html, acc) {
   const re = /<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   for (const match of html.matchAll(re)) {
     try { walkLd(JSON.parse(match[1]), acc); } catch { /* invalid block */ }
   }
-}
-
-function asList(value) {
-  return [].concat(value || []).filter((v) => typeof v === 'string' || typeof v === 'number');
 }
 
 function walkLd(node, acc, seen = new Set()) {
@@ -61,11 +38,11 @@ function walkLd(node, acc, seen = new Set()) {
   const types = [].concat(node['@type'] || []).map((t) => String(t).toLowerCase());
   const org = types.some((t) => t.includes('organization') || t.includes('localbusiness'));
   const point = types.some((t) => t.includes('contactpoint'));
-  if (org && node.name && !acc.companyName) acc.companyName = decode(node.name);
-  const role = point ? (ROLES.find((r) => String(node.name || '').toLowerCase().includes(r)) || '') : '';
+  if (org && node.name && !acc.companyName) acc.companyName = decodeLeadText(node.name);
+  const role = point ? (ROLE_HINTS.find((r) => String(node.name || '').toLowerCase().includes(r)) || '') : '';
   if (org || point) {
-    for (const email of asList(node.email)) acc.emails.push({ email: String(email), role });
-    for (const phone of asList(node.telephone)) acc.phones.push(String(phone));
+    for (const email of asStringList(node.email)) acc.emails.push({ email: String(email), role });
+    for (const phone of asStringList(node.telephone)) acc.phones.push(String(phone));
   }
   for (const value of Object.values(node)) {
     if (value && typeof value === 'object') walkLd(value, acc, seen);
@@ -77,22 +54,9 @@ function metaContent(html, prop) {
     const t = tag[0];
     const property = (t.match(/\b(?:property|name)\s*=\s*["']([^"']+)["']/i) || [])[1] || '';
     if (property.toLowerCase() !== prop) continue;
-    return decode((t.match(/\bcontent\s*=\s*["']([^"']*)["']/i) || [])[1] || '');
+    return decodeLeadText((t.match(/\bcontent\s*=\s*["']([^"']*)["']/i) || [])[1] || '');
   }
   return '';
-}
-
-function cleanSocial(raw) {
-  if (/\/share(?:[/?#]|$)|intent\/tweet|sharer\.php|sharing\/share/i.test(raw)) return '';
-  try {
-    const u = new URL(raw);
-    const host = u.hostname.replace(/^www\./, '');
-    if (!SOCIAL_HOSTS.some((h) => host === h || host.endsWith(`.${h}`))) return '';
-    if (!u.pathname || u.pathname === '/') return '';
-    return `${u.origin}${u.pathname}`.replace(/\/$/, '');
-  } catch {
-    return '';
-  }
 }
 
 /**
@@ -109,18 +73,18 @@ export function extractLeads(html = '', url = '') {
   let mailto = 0;
   for (const match of source.matchAll(/mailto:([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/gi)) {
     const value = match[1].toLowerCase();
-    if (junkEmail(value)) continue;
+    if (isJunkEmail(value)) continue;
     mailto++;
     pushContact(contacts, seen, { value, kind: 'email', role: roleNear(source, match.index || 0), page: url });
   }
   for (const item of ld.emails) {
     const email = String(item.email || '').replace(/^mailto:/i, '').toLowerCase();
-    if (!junkEmail(email)) pushContact(contacts, seen, { value: email, kind: 'email', role: item.role || '', page: url });
+    if (!isJunkEmail(email)) pushContact(contacts, seen, { value: email, kind: 'email', role: item.role || '', page: url });
   }
   if (!mailto) {
     for (const match of source.matchAll(/\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,7}\b/gi)) {
       const value = match[0].toLowerCase();
-      if (!junkEmail(value)) pushContact(contacts, seen, { value, kind: 'email', role: roleNear(source, match.index || 0), page: url });
+      if (!isJunkEmail(value)) pushContact(contacts, seen, { value, kind: 'email', role: roleNear(source, match.index || 0), page: url });
     }
   }
 
@@ -142,7 +106,7 @@ export function extractLeads(html = '', url = '') {
 
   const bookingLinks = [];
   const booked = new Set();
-  for (const match of source.matchAll(BOOKING)) {
+  for (const match of source.matchAll(BOOKING_RE)) {
     const value = match[0].replace(/&amp;/g, '&').split(/[?#]/)[0];
     if (booked.has(value)) continue;
     booked.add(value);
@@ -158,10 +122,6 @@ export function extractLeads(html = '', url = '') {
     phones: of('phone').slice(0, 3),
     socials: of('social').slice(0, 4),
   };
-}
-
-function addUnique(list, value) {
-  if (value && !list.includes(value)) list.push(value);
 }
 
 const crawledUrls = new WeakMap();
