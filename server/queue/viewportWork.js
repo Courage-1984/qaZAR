@@ -5,6 +5,7 @@ import { capturePage } from '../engine/capturePage.js';
 import { absorbRendered } from '../crawler/absorb.js';
 import { baselinePath, hasBaseline, promote } from '../visual/baseline.js';
 import { diffImages } from '../visual/diff.js';
+import { captureDiffStatus } from '../visual/diffMetrics.js';
 import { runPath } from '../storage/runStore.js';
 import { siteHash, storage } from '../storage/storageAdapter.js';
 import { touchBaseline } from '../storage/db.js';
@@ -62,7 +63,7 @@ export async function processViewport(run, page, vp) {
       rec.diff = diffRel.replaceAll('\\', '/');
       rec.diffPercent = Number(d.diffPercent.toFixed(4));
       rec.sizeChanged = d.sizeChanged;
-      rec.status = d.diffPercent >= config.diffThresholdPercent || d.sizeChanged ? 'changed' : 'unchanged';
+      rec.status = captureDiffStatus(d.diffPercent, d.sizeChanged, config.diffThresholdPercent);
     }
     if (rec.shot) await storage.mirrorArtifact(run.id, rec.shot);
     await touchBaseline(siteHash(domain), ownerId);
