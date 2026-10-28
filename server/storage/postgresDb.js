@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { config } from '../config.js';
+import { inflightStatusSql } from './inflightStatus.js';
 
 const { Pool } = pg;
 let pool;
@@ -125,7 +126,7 @@ export async function listRunPayloads() {
 
 export async function countInflight(ownerId) {
   const { rows } = await getPool().query(
-    `SELECT COUNT(*)::int AS n FROM runs WHERE owner_id = $1 AND status IN ('queued', 'crawling', 'capturing')`,
+    `SELECT COUNT(*)::int AS n FROM runs WHERE owner_id = $1 AND status IN (${inflightStatusSql()})`,
     [ownerId],
   );
   return rows[0]?.n || 0;
@@ -166,7 +167,7 @@ export async function deleteBaselineMeta(ownerId, siteHash) {
 
 export async function countActiveRuns() {
   const { rows } = await getPool().query(
-    `SELECT COUNT(*)::int AS n FROM runs WHERE status IN ('queued', 'crawling', 'capturing')`,
+    `SELECT COUNT(*)::int AS n FROM runs WHERE status IN (${inflightStatusSql()})`,
   );
   return rows[0]?.n || 0;
 }

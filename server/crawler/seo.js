@@ -10,6 +10,7 @@ import {
 import {
   canonicalFlags, dupGroups, pageIssues, scoreSeoPages, seoIssue,
 } from './seoIssues.js';
+import { readSeoJsonLd } from './seoJsonLd.js';
 
 function scanMeta(html) {
   const robots = [];
@@ -35,39 +36,11 @@ function linkHref(html, rel) {
   return null;
 }
 
-function collectTypes(node, out) {
-  if (!node || typeof node !== 'object') return;
-  if (Array.isArray(node)) {
-    for (const item of node) collectTypes(item, out);
-    return;
-  }
-  const t = node['@type'];
-  if (typeof t === 'string') out.push(t);
-  else if (Array.isArray(t)) for (const item of t) if (typeof item === 'string') out.push(item);
-  if (node['@graph']) collectTypes(node['@graph'], out);
-}
-
-function readJsonLd(html) {
-  const types = [];
-  let blocks = 0;
-  let invalid = false;
-  const re = /<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-  for (const m of String(html).matchAll(re)) {
-    blocks++;
-    try {
-      collectTypes(JSON.parse(m[1]), types);
-    } catch {
-      invalid = true;
-    }
-  }
-  return { blocks, invalid, types: [...new Set(types)].slice(0, 8) };
-}
-
 /**
  * @returns {object} per-page search fields
  */
 export function extractPageSeo(html = '', url = '', headers = null) {
-  const jsonLd = readJsonLd(html);
+  const jsonLd = readSeoJsonLd(html);
   const doc = stripBoilerplate(html);
   const { robots, named, props } = scanMeta(doc);
   const title = decodeEntities((doc.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || '');

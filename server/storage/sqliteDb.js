@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { config } from '../config.js';
+import { inflightStatusSql } from './inflightStatus.js';
 
 let db;
 let dbFile = '';
@@ -108,7 +109,7 @@ export function listRunPayloads() {
 }
 
 export function countInflight(ownerId) {
-  const row = getDb().prepare(`SELECT COUNT(*) AS n FROM runs WHERE owner_id = ? AND status IN ('queued', 'crawling', 'capturing')`).get(ownerId);
+  const row = getDb().prepare(`SELECT COUNT(*) AS n FROM runs WHERE owner_id = ? AND status IN (${inflightStatusSql()})`).get(ownerId);
   return row?.n || 0;
 }
 
@@ -145,7 +146,7 @@ export function deleteBaselineMeta(ownerId, siteHash) {
 }
 
 export function countActiveRuns() {
-  const row = getDb().prepare(`SELECT COUNT(*) AS n FROM runs WHERE status IN ('queued', 'crawling', 'capturing')`).get();
+  const row = getDb().prepare(`SELECT COUNT(*) AS n FROM runs WHERE status IN (${inflightStatusSql()})`).get();
   return row?.n || 0;
 }
 
