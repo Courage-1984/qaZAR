@@ -11,23 +11,22 @@ import { siteHash, storage } from '../storage/storageAdapter.js';
 import { touchBaseline } from '../storage/db.js';
 import { firstLine } from '../util/firstLine.js';
 import { crossViewportViolations } from './crossViewport.js';
+import {
+  asPosixRel, emptyViewportRecord, viewportCaptureOptions, viewportShotRels,
+} from './viewportPaths.js';
 
 export async function processViewport(run, page, vp) {
   const dir = runPath(run.id);
-  const rel = path.join('shots', page.slug, `${vp.name}.png`);
-  const abs = path.join(dir, rel);
-  const rec = { status: 'pending', shot: null, base: null, diff: null, diffPercent: null, violations: [], metrics: null, error: null };
+  const rels = viewportShotRels(page.slug, vp.name);
+  const abs = path.join(dir, rels.shot);
+  const rec = emptyViewportRecord();
   page.viewports[vp.name] = rec;
   try {
     let lastErr;
     let res;
     for (let attempt = 0; attempt < 2 && !res; attempt++) {
       try {
-        res = await capturePage(page.url, vp, abs, {
-          collectLeads: vp.name === 'desktop',
-          deterministic: run.input?.deterministic === true,
-          fast: Boolean(run.input?.publicCaller),
-        });
+        res = await capturePage(page.url, vp, abs, viewportCaptureOptions(run, vp));
       } catch (e) {
         lastErr = e;
       }
@@ -42,7 +41,7 @@ export async function processViewport(run, page, vp) {
       console.log(`qaZAR viewport ${vp.name} goto=${m.gotoMs} idle=${m.idleMs} scroll=${m.scrollMs} fonts=${m.fontMs} shot=${m.shotMs}`);
       delete res.timings;
     }
-    rec.shot = rel.replaceAll('\\', '/');
+    rec.shot = asPosixRel(rels.shot);
     rec.violations = res.violations;
     rec.metrics = res.metrics;
     if (res.partial) rec.partial = true;
@@ -53,14 +52,12 @@ export async function processViewport(run, page, vp) {
       promote(domain, page.slug, vp.name, abs, ownerId);
       rec.status = 'new';
     } else {
-      const baseRel = path.join('base', page.slug, `${vp.name}.png`);
-      const diffRel = path.join('diffs', page.slug, `${vp.name}.png`);
-      fs.mkdirSync(path.dirname(path.join(dir, baseRel)), { recursive: true });
-      fs.mkdirSync(path.dirname(path.join(dir, diffRel)), { recursive: true });
-      fs.copyFileSync(baselinePath(domain, page.slug, vp.name, ownerId), path.join(dir, baseRel));
-      const d = diffImages(path.join(dir, baseRel), abs, path.join(dir, diffRel));
-      rec.base = baseRel.replaceAll('\\', '/');
-      rec.diff = diffRel.replaceAll('\\', '/');
+      fs.mkdirSync(path.dirname(path.join(dir, rels.base)), { recursive: true });
+      fs.mkdirSync(path.dirname(path.join(dir, rels.diff)), { recursive: true });
+      fs.copyFileSync(baselinePath(domain, page.slug, vp.name, ownerId), path.join(dir, rels.base));
+      const d = diffImages(path.join(dir, rels.base), abs, path.join(dir, rels.diff));
+      rec.base = asPosixRel(rels.base);
+      rec.diff = asPosixRel(rels.diff);
       rec.diffPercent = Number(d.diffPercent.toFixed(4));
       rec.sizeChanged = d.sizeChanged;
       rec.status = captureDiffStatus(d.diffPercent, d.sizeChanged, config.diffThresholdPercent);
