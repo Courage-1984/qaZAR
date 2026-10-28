@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { getDb } from '../storage/sqliteDb.js';
 import { getRun, save } from '../storage/runStore.js';
+import { isDeadAttempt, jobErrorLine, nextAttempts } from './jobPolicy.js';
 
 export function enqueue(runId, kind = 'audit', delayMs = 0) {
   const now = Date.now();
@@ -34,7 +35,7 @@ export function complete(jobId) {
 }
 
 export function retryLater(jobId, delayMs, err, now = Date.now()) {
-  const message = String(err?.message || err || '').split('\n')[0];
+  const message = jobErrorLine(err);
   getDb().prepare(`
     UPDATE jobs
     SET status = 'queued', attempts = attempts + 1, available_at = ?, lease_until = NULL,
@@ -45,9 +46,9 @@ export function retryLater(jobId, delayMs, err, now = Date.now()) {
 
 export function fail(jobId, err, now = Date.now()) {
   const row = getDb().prepare('SELECT attempts FROM jobs WHERE id = ?').get(jobId);
-  const attempts = (row?.attempts || 0) + 1;
-  const message = String(err?.message || err || '').split('\n')[0];
-  if (attempts >= 3) {
+  const attempts = nextAttempts(row?.attempts);
+  const message = jobErrorLine(err);
+  if (isDeadAttempt(attempts)) {
     getDb().prepare(`UPDATE jobs SET status = 'failed', attempts = ?, last_error = ?, lease_until = NULL WHERE id = ?`)
       .run(attempts, message, jobId);
     return true;
@@ -79,8 +80,8 @@ export function countJobs() {
 export function reclaimExpired(now = Date.now()) {
   const rows = getDb().prepare(`SELECT id, attempts FROM jobs WHERE status = 'leased' AND lease_until < ?`).all(now);
   for (const row of rows) {
-    const attempts = row.attempts + 1;
-    if (attempts >= 3) {
+    const attempts = nextAttempts(row.attempts);
+    if (isDeadAttempt(attempts)) {
       getDb().prepare(`UPDATE jobs SET status = 'failed', attempts = ?, last_error = 'lease expired', lease_until = NULL WHERE id = ?`)
         .run(attempts, row.id);
     } else {

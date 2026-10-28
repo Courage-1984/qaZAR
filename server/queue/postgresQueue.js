@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { getPool } from '../storage/postgresDb.js';
 import { getRun, save } from '../storage/runStore.js';
+import { isDeadAttempt, jobErrorLine, nextAttempts } from './jobPolicy.js';
 
 export async function enqueue(runId, kind = 'audit', delayMs = 0) {
   const now = Date.now();
@@ -44,7 +45,7 @@ export async function complete(jobId) {
 }
 
 export async function retryLater(jobId, delayMs, err, now = Date.now()) {
-  const message = String(err?.message || err || '').split('\n')[0];
+  const message = jobErrorLine(err);
   await getPool().query(`
     UPDATE jobs
     SET status = 'queued', attempts = attempts + 1, available_at = $1, lease_until = NULL,
@@ -55,9 +56,9 @@ export async function retryLater(jobId, delayMs, err, now = Date.now()) {
 
 export async function fail(jobId, err, now = Date.now()) {
   const { rows } = await getPool().query('SELECT attempts FROM jobs WHERE id = $1', [jobId]);
-  const attempts = (rows[0]?.attempts || 0) + 1;
-  const message = String(err?.message || err || '').split('\n')[0];
-  if (attempts >= 3) {
+  const attempts = nextAttempts(rows[0]?.attempts);
+  const message = jobErrorLine(err);
+  if (isDeadAttempt(attempts)) {
     await getPool().query(
       `UPDATE jobs SET status = 'failed', attempts = $1, last_error = $2, lease_until = NULL WHERE id = $3`,
       [attempts, message, jobId],
@@ -77,8 +78,8 @@ export async function reclaimExpired(now = Date.now()) {
     [now],
   );
   for (const row of rows) {
-    const attempts = row.attempts + 1;
-    if (attempts >= 3) {
+    const attempts = nextAttempts(row.attempts);
+    if (isDeadAttempt(attempts)) {
       await getPool().query(
         `UPDATE jobs SET status = 'failed', attempts = $1, last_error = 'lease expired', lease_until = NULL WHERE id = $2`,
         [attempts, row.id],

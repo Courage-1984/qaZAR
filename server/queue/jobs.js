@@ -5,6 +5,7 @@
 import * as sqlite from './sqliteQueue.js';
 import * as postgres from './postgresQueue.js';
 import { awaitDb, dbDriver } from '../storage/db.js';
+import { shouldStealLiveLeases } from './jobPolicy.js';
 
 async function call(name, ...args) {
   await awaitDb();
@@ -24,7 +25,7 @@ export const cancelRun = (...a) => call('cancelRun', ...a);
 
 /** Only for single-worker cold start. Multi-worker must not steal live leases. */
 export async function reclaimOrphanedLeases(...args) {
-  if (process.env.QAZAR_SINGLE_WORKER === '1' && dbDriver === 'sqlite') {
+  if (shouldStealLiveLeases(process.env, dbDriver)) {
     return sqlite.reclaimLeased(...args);
   }
   return reclaimExpired(...args);
