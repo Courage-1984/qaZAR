@@ -10,6 +10,7 @@ import {
   foldJobCounts,
   leaseUntil,
 } from './jobTiming.js';
+import { cancelableJobStatusSql } from './jobStatuses.js';
 
 export function enqueue(runId, kind = 'audit', delayMs = 0) {
   const now = Date.now();
@@ -105,6 +106,6 @@ export async function cancelRun(id) {
   }
   getDb().prepare(`
     UPDATE jobs SET status = 'cancelled', lease_until = NULL
-    WHERE run_id = ? AND status IN ('queued', 'leased')
+    WHERE run_id = ? AND status IN (${cancelableJobStatusSql()})
   `).run(id);
 }
