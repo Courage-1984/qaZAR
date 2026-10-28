@@ -13,8 +13,9 @@ export function envCsvList(raw = '') {
   return String(raw).split(',').map((s) => s.trim()).filter(Boolean);
 }
 
-/** Tunnel runs unless --no-tunnel / NO_TUNNEL=1 / QAZAR_TUNNEL=0. */
+/** `--tunnel` forces the tunnel. Otherwise off for --no-tunnel / NO_TUNNEL=1 / QAZAR_TUNNEL=0. */
 export function tunnelEnabled(argv = process.argv, env = process.env) {
+  if (argv.includes('--tunnel')) return true;
   return !argv.includes('--no-tunnel') && env.NO_TUNNEL !== '1' && env.QAZAR_TUNNEL !== '0';
 }
 

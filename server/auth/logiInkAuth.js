@@ -35,14 +35,26 @@ export function authViaLogiInk(env = process.env) {
   };
 }
 
+/** Browser Origin from GitHub Pages. Other anonymous callers stay blocked. */
+export function githubPagesOrigin(req) {
+  const origin = String(req.get?.('origin') || req.headers?.origin || '').trim();
+  if (!origin) return false;
+  try {
+    return new URL(origin).hostname.endsWith('github.io');
+  } catch {
+    return false;
+  }
+}
+
 /**
  * When LOGI_INK_API_SECRET is set, POST /api/runs must present a valid
- * Logi-Ink x-api-key, a QAZAR bearer key, or an operator cookie.
- * Anonymous GitHub Pages posts are rejected in that mode.
+ * Logi-Ink x-api-key, a QAZAR bearer key, an operator cookie, or a
+ * GitHub Pages Origin so the public console can still submit.
  */
 export function requirePartnerOrOperatorOnPost(req, res, next) {
   if (req.method !== 'POST') return next();
   if (!logiInkSecret()) return next();
   if (req.auth?.via === 'key' || req.auth?.via === 'cookie') return next();
+  if (req.auth?.via === 'pages' && githubPagesOrigin(req)) return next();
   return res.status(401).json({ error: 'Unauthorized' });
 }

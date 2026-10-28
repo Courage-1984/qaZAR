@@ -3,14 +3,22 @@
  * Prefer LOGI_INK_API_SECRET via x-api-key; fall back to Bearer QAZAR_API_KEY.
  */
 const FORMSPREE = 'https://formspree.io/f/mkgdbljg';
-const PRODUCTION_ORIGIN = 'https://logi-ink.co.za';
+const PRODUCTION_ORIGINS = new Set([
+  'https://logi-ink.co.za',
+  'https://www.logi-ink.co.za',
+]);
 
 function corsHeaders(request, env) {
   const origin = request.headers.get('origin') || '';
+  const local = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
   const allowed = env.ENVIRONMENT === 'production'
-    ? origin === PRODUCTION_ORIGIN
-    : origin === PRODUCTION_ORIGIN || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
-  const headers = { 'Content-Type': 'application/json' };
+    ? PRODUCTION_ORIGINS.has(origin)
+    : PRODUCTION_ORIGINS.has(origin) || local;
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Accept',
+  };
   if (allowed && origin) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers.Vary = 'Origin';
@@ -26,6 +34,7 @@ function qazarBase(env) {
   return String(env.QAZAR_API_BASE || '').replace(/\/$/, '');
 }
 
+/** Prefer x-api-key (LOGI_INK_API_SECRET); fall back to Bearer QAZAR_API_KEY. */
 function qazarHeaders(env) {
   const headers = { 'Content-Type': 'application/json' };
   const logiSecret = String(env.LOGI_INK_API_SECRET || '').trim();
@@ -81,11 +90,38 @@ async function forwardForm(env, fields) {
   });
 }
 
+async function billingAccount(env) {
+  const res = await fetch(`${qazarBase(env)}/api/billing/account`, {
+    headers: qazarHeaders(env),
+    signal: AbortSignal.timeout(10000),
+  });
+  const data = await res.json().catch(() => ({ error: 'account failed' }));
+  return { status: res.status, data };
+}
+
+async function billingCheckout(env) {
+  const res = await fetch(`${qazarBase(env)}/api/billing/checkout`, {
+    method: 'POST',
+    headers: qazarHeaders(env),
+    signal: AbortSignal.timeout(15000),
+  });
+  const data = await res.json().catch(() => ({ error: 'checkout failed' }));
+  return { status: res.status, data };
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders(request, env) });
+    }
+    if (request.method === 'GET' && url.pathname === '/billing/account') {
+      const { status, data } = await billingAccount(env);
+      return json(request, env, data, status);
+    }
+    if (request.method === 'POST' && url.pathname === '/billing/checkout') {
+      const { status, data } = await billingCheckout(env);
+      return json(request, env, data, status);
     }
     if (request.method === 'GET' && url.pathname.startsWith('/audit/')) {
       const token = url.pathname.slice('/audit/'.length);

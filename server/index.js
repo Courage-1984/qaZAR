@@ -1,3 +1,4 @@
+import './loadEnv.js';
 import { config } from './config.js';
 import { ensurePortFree } from './freePort.js';
 import { startPublicTunnel, publishDiscovery } from './tunnel.js';

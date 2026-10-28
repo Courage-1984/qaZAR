@@ -1,3 +1,4 @@
+import './loadEnv.js';
 import crypto from 'node:crypto';
 import {
   claim, complete, countJobs, fail, heartbeat, reclaimExpired, recoverAfterRestart,

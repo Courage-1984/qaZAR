@@ -82,4 +82,18 @@ server {
 | `MAIL_API_KEY` / `MAIL_FROM` / `AGENCY_INBOX` | empty | PDF mail. Unset mail is skipped when there is no prospect |
 | `STRIPE_*` | empty | Billing: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID` |
 
-The API process does not run Playwright. Start `npm run worker` (or scale the `worker` service) beside `npm run server`. See [phase-5-account.md](phase-5-account.md). Set `NO_TUNNEL=1` when you do not want a public URL.
+The API process does not run Playwright. Start `npm run worker` (or scale the `worker` service) beside `npm run server`. See [phase-5-account.md](phase-5-account.md). Set `NO_TUNNEL=1` when you do not want a public URL. `npm run server:tunnel` passes `--tunnel`, which forces the tunnel even when `NO_TUNNEL=1`.
+
+Copy `.env.example` to `.env`. The API and capture worker load that file on boot and do not override variables already set in the environment. Compose reads the same names.
+
+## 4. Logi-Ink partner
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `LOGI_INK_API_SECRET` | empty | Shared with the Logi-Ink Worker (`x-api-key`). When set, anonymous `POST /api/runs` is 401 except from `*.github.io` |
+| `LOGI_INK_OWNER_ID` | `logi-ink` | Tenant id for partner runs |
+| `LOGI_INK_OWNER_EMAIL` | `AGENCY_INBOX` | Inbox for the internal PDF |
+| `QAZAR_PUBLIC_BASE` | empty | Public API origin used in mailed links |
+| `STRIPE_SUCCESS_URL` / `STRIPE_CANCEL_URL` | Logi-Ink contact page | Checkout return URLs |
+
+Mail still needs `MAIL_API_KEY` and `MAIL_FROM` (or `SMTP_HOST`). Checkout still needs `STRIPE_SECRET_KEY` and `STRIPE_PRICE_ID`. Leave those empty until the provider keys exist. The Worker calls this API at `QAZAR_API_BASE`; a quick tunnel URL changes every time the API process restarts.

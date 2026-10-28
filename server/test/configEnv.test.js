@@ -22,6 +22,7 @@ test('tunnelEnabled and dbDriverFromEnv respect kill switches', () => {
   assert.equal(tunnelEnabled([], {}), true);
   assert.equal(tunnelEnabled(['--no-tunnel'], {}), false);
   assert.equal(tunnelEnabled([], { NO_TUNNEL: '1' }), false);
+  assert.equal(tunnelEnabled(['--tunnel'], { NO_TUNNEL: '1' }), true);
   assert.equal(tunnelEnabled([], { QAZAR_TUNNEL: '0' }), false);
   assert.equal(dbDriverFromEnv({}), 'sqlite');
   assert.equal(dbDriverFromEnv({ DATABASE_URL: 'postgres://x' }), 'postgres');

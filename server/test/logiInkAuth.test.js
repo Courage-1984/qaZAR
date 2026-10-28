@@ -32,25 +32,38 @@ test('authViaLogiInk marks public partner ownership', () => {
   assert.equal(auth.source, 'logi-ink');
 });
 
-test('requirePartnerOrOperatorOnPost blocks anonymous POST when secret set', () => {
+function postReq(auth, origin) {
+  return {
+    method: 'POST',
+    auth,
+    get: (name) => (name === 'origin' ? origin : ''),
+  };
+}
+
+test('requirePartnerOrOperatorOnPost allows GitHub Pages and blocks other anonymous POSTs', () => {
   const prev = process.env.LOGI_INK_API_SECRET;
   process.env.LOGI_INK_API_SECRET = 'set-for-gate';
   try {
     let status = 0;
     const res = { status: (n) => ({ json: () => { status = n; } }) };
-    requirePartnerOrOperatorOnPost({ method: 'POST', auth: { via: 'pages' } }, res, () => {
-      status = 200;
-    });
+    const nextOk = () => { status = 200; };
+    requirePartnerOrOperatorOnPost(postReq({ via: 'pages' }, ''), res, nextOk);
     assert.equal(status, 401);
     status = 0;
-    requirePartnerOrOperatorOnPost({ method: 'POST', auth: { via: 'key' } }, res, () => {
-      status = 200;
-    });
+    requirePartnerOrOperatorOnPost(postReq({ via: 'pages' }, 'https://evil.example'), res, nextOk);
+    assert.equal(status, 401);
+    status = 0;
+    requirePartnerOrOperatorOnPost(
+      postReq({ via: 'pages' }, 'https://courage-1984.github.io'),
+      res,
+      nextOk,
+    );
     assert.equal(status, 200);
     status = 0;
-    requirePartnerOrOperatorOnPost({ method: 'GET', auth: { via: 'pages' } }, res, () => {
-      status = 200;
-    });
+    requirePartnerOrOperatorOnPost(postReq({ via: 'key' }, ''), res, nextOk);
+    assert.equal(status, 200);
+    status = 0;
+    requirePartnerOrOperatorOnPost({ method: 'GET', auth: { via: 'pages' }, get: () => '' }, res, nextOk);
     assert.equal(status, 200);
   } finally {
     if (prev === undefined) delete process.env.LOGI_INK_API_SECRET;
