@@ -1,6 +1,7 @@
 /**
- * Calculates executive UX/UI Health Scores and business impact metrics
- * for client-facing audit reports and lead generation.
+ * Executive UX health scores and sales-facing impact metrics.
+ * Cross-viewport dedupe happens here (not in evaluate.js): each page×viewport
+ * capture still runs independently; identical components collapse to one failure.
  */
 
 import { captureCoverage } from './captureCoverage.js';
@@ -8,12 +9,15 @@ import { profileFacts } from './profileFacts.js';
 import { generateActionRoadmap } from './actionRoadmap.js';
 import { materializeClusters, observeViolation } from './clusterFold.js';
 import { healthMetricsFromClusters } from './healthMetrics.js';
+import {
+  estimateEffort, frameworkBloatWarning,
+} from './rebuildCase.js';
 
 export { generateActionRoadmap };
 
 /**
- * Clusters recurring violations across pages and viewports to eliminate
- * reporting noise, false duplication, and inflated defect counts.
+ * Clusters recurring violations across pages and viewports so a contrast fail
+ * on the same control in seven viewports counts as one component failure.
  */
 export function clusterDefects(run) {
   const map = new Map();
@@ -31,16 +35,31 @@ export function clusterDefects(run) {
 export function calculateHealthScore(run) {
   const clusters = clusterDefects(run);
   const coverage = captureCoverage(run);
-  const { metrics, categories } = healthMetricsFromClusters(
+  const { metrics, categories, score, grade } = healthMetricsFromClusters(
     clusters,
     coverage,
     run.pages?.length || 0,
   );
+  const profile = run.siteProfile || {};
+  const effort = estimateEffort({
+    distinctErrors: metrics.distinctErrors,
+    distinctWarnings: metrics.distinctWarnings,
+    techStack: profile.techStack || [],
+    categories,
+    seoScore: profile.seoScore,
+  });
+  const bloat = frameworkBloatWarning(profile.techStack || []);
   return {
     metrics,
     clusters,
+    score,
+    grade,
     omitted: 0,
-    facts: profileFacts(run.siteProfile),
-    roadmap: generateActionRoadmap(run, categories),
+    facts: profileFacts(profile),
+    roadmap: generateActionRoadmap(run, categories, clusters),
+    sales: {
+      ...effort,
+      frameworkBloat: bloat,
+    },
   };
 }

@@ -11,13 +11,14 @@ test('PDF HTML is a document, not the on-screen report chrome', () => {
     pages: [],
     summary: { changed: 0 },
   }, 'consulting@qazar.dev', { agency: 'Logi-Ink' });
-  assert.equal(/grade/i.test(html), false);
+  assert.match(html, /grade/i);
   assert.equal(html.includes('Verified Domain Ownership'), false);
   assert.equal(html.includes(domain), false);
   assert.match(html, /evil\.example\/&lt;script&gt;/);
   assert.equal(html.includes('btn-print'), false);
   assert.equal(html.includes('summary-md'), false);
   assert.match(html, /Reply to consulting@qazar\.dev/);
+  assert.match(html, /Logi-Ink/);
 });
 
 test('PDF HTML includes stack, funnel, viewport errors, and capture time', () => {

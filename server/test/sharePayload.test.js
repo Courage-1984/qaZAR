@@ -60,8 +60,8 @@ test('buildSharePayload for done includes score and review counts only', () => {
     siteProfile: { leadContacts: { emails: ['ceo@shop.example'] } },
   }, true);
   assert.equal(payload.domain, 'https://shop.example');
-  // calculateHealthScore does not expose `.score`; share keeps the field as null.
-  assert.equal(payload.score, null);
+  // Public share may expose the component-level health score, never contacts.
+  assert.equal(typeof payload.score, 'number');
   assert.ok(typeof payload.coverage === 'string' && payload.coverage.length > 0);
   assert.ok(payload.review);
   assert.equal(typeof payload.review.retained, 'number');

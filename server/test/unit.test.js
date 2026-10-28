@@ -121,17 +121,18 @@ test('calculateHealthScore reports coverage and keeps needs-review out of the co
   };
   const clusters = clusterDefects(mockRun);
   const warn = clusters.find((c) => c.rule === 'target-size-minimum' && c.severity === 'warn');
-  assert.equal(warn.observed, 'observed on 2 of 2 page(s)');
+  assert.match(warn.observed, /1 component failure/);
+  assert.equal(warn.componentFailures, 1);
   assert.equal(warn.isGlobal, undefined);
   assert.equal(clusters.filter((c) => c.rule === 'target-size-minimum').length, 2);
   const result = calculateHealthScore(mockRun);
-  assert.equal(result.score, undefined);
-  assert.equal(result.grade, undefined);
-  assert.equal(result.roiAssessment, undefined);
+  assert.equal(typeof result.score, 'number');
+  assert.ok(result.grade);
+  assert.ok(result.sales);
   assert.equal(result.metrics.categories.wcagContrast, 1);
   assert.equal(result.metrics.totalCaptures, 2);
   assert.match(result.metrics.coverageLine, /2 of 3 captures completed, 1 failed\. Some counts are capped and are not exhaustive\. 1 capture\(s\) hit the font wait and are partial\. Deterministic mode injected a frozen clock/);
-  assert.match(result.roadmap.coreUx.join(' '), /difficult to activate/);
+  assert.match(result.roadmap.coreUx.join(' '), /mobile conversion/i);
 });
 
 test('generateExecutiveReport states measurements and omits unsupported conclusions', async () => {
@@ -149,16 +150,16 @@ test('generateExecutiveReport states measurements and omits unsupported conclusi
   };
   const html = generateExecutiveReport(mockRun, 'leads@agency.com', { agency: 'Apex Advisory' });
   const pdf = generatePdfReport(mockRun, 'leads@agency.com', { agency: 'Apex Advisory' });
-  for (const bit of ['Apex Advisory', 'ceo@client.com', 'not a sales contact', 'Publicly listed contacts', '0/100', 'Print / Save PDF', 'Copy Summary', 'summary-md', 'mailto:leads@agency.com', '1 of 1 captures completed']) {
+  for (const bit of ['Apex Advisory', 'ceo@client.com', 'not a sales contact', 'Publicly listed contacts', '0/100', 'Print / Save PDF', 'Copy Summary', 'summary-md', 'mailto:leads@agency.com', '1 of 1 captures completed', 'Health grade']) {
     assert.ok(html.includes(bit), bit);
   }
   assert.ok(pdf.includes('1 of 1 captures completed'));
+  assert.match(pdf, /grade/i);
   for (const doc of [html, pdf]) {
     assert.equal(doc.includes('Engineering Remediation'), false);
     assert.equal(doc.includes('Verified Domain Ownership'), false);
     assert.equal(doc.includes('Transport Protected'), false);
     assert.equal(doc.includes('up to 28%'), false);
-    assert.equal(/grade/i.test(doc), false);
   }
 });
 

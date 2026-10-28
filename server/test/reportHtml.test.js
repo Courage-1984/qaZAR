@@ -11,7 +11,7 @@ test('reportFindingsHtml marks info as needs review', () => {
     severity: 'info', rule: 'contrast-indeterminate', observed: '1 of 1',
     totalOccurrences: 1, detail: 'maybe', selector: '#a',
   }]);
-  assert.match(html, /needs review/);
+  assert.match(html, /Needs review/i);
   assert.match(html, /contrast-indeterminate/);
   assert.match(html, /#a/);
 });

@@ -32,6 +32,9 @@ export function getReportStyles() {
     .cta-card { background:linear-gradient(135deg,rgba(168,85,247,.22),rgba(244,114,182,.16)); border:1px solid rgba(244,114,182,.45); border-radius:18px; padding:1.75rem 1.25rem; text-align:center; margin-top:2rem; }
     .cta-card h2 { margin-top:0; }
     .cta-card p { color:var(--muted); max-width:40rem; margin:0 auto 1rem; }
+    .grade-card .effort-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:1rem; margin:1rem 0; }
+    .effort-num { font-size:1.6rem; font-weight:800; }
+    .sales-bloat { color:var(--warn); }
     .btn-cta, .btn-print { min-height:48px; max-width:100%; display:inline-flex; align-items:center; justify-content:center; text-align:center; border-radius:12px; font-weight:700; text-decoration:none; padding:0 1rem; }
     .btn-cta { background:linear-gradient(90deg,#a855f7,#f472b6); color:#1a0418; }
     .btn-print { background:rgba(255,255,255,.06); border:1px solid var(--border); color:#fff; cursor:pointer; }

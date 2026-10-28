@@ -15,8 +15,10 @@ test('healthMetricsFromClusters tallies errors warns and categories', () => {
   assert.equal(metrics.failedCaptures, 1);
   assert.equal(metrics.distinctErrors, 1);
   assert.equal(metrics.distinctWarnings, 1);
-  assert.equal(metrics.rawErrors, 3);
-  assert.equal(metrics.rawWarnings, 2);
-  assert.equal(categories.overflowBreakage, 3);
-  assert.equal(categories.mobileTouch, 2);
+  assert.equal(metrics.rawErrors, 1);
+  assert.equal(metrics.rawWarnings, 1);
+  assert.equal(categories.overflowBreakage, 1);
+  assert.equal(categories.mobileTouch, 1);
+  assert.equal(typeof metrics.score, 'number');
+  assert.ok(metrics.grade);
 });
