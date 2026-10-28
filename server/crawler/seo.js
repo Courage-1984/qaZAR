@@ -4,38 +4,11 @@
  * Static HTML only — client-rendered tags are invisible here.
  */
 import { isUrlAllowed } from './robots.js';
+import {
+  attr, clipText, decodeEntities, headerValue, isRobotsBlocked, stripBoilerplate,
+} from './htmlBits.js';
 
 const VAGUE = new Set(['home', 'index', 'untitled', 'welcome', 'profile']);
-
-function decode(s) {
-  return String(s || '')
-    .replace(/&amp;/gi, '&')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#0?39;|&apos;/gi, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function attr(tag, name) {
-  const m = String(tag).match(new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)')`, 'i'));
-  return m ? (m[1] ?? m[2] ?? '') : null;
-}
-
-function header(headers, name) {
-  if (!headers) return '';
-  const v = typeof headers.get === 'function' ? headers.get(name) : headers[name.toLowerCase()];
-  return v ? String(v) : '';
-}
-
-function strip(html) {
-  return String(html)
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<script\b[\s\S]*?<\/script>/gi, '')
-    .replace(/<style\b[\s\S]*?<\/style>/gi, '');
-}
 
 function scanMeta(html) {
   const robots = [];
@@ -59,29 +32,6 @@ function linkHref(html, rel) {
     if (rels.includes(rel)) return attr(tag[0], 'href') || '';
   }
   return null;
-}
-
-/** Rules that apply to Google. Agent-scoped rules for other bots are ignored. */
-function tokensFrom(raw) {
-  const out = [];
-  for (const part of String(raw || '').split(',')) {
-    const p = part.trim().toLowerCase();
-    if (!p) continue;
-    const colon = p.indexOf(':');
-    if (colon > 0) {
-      const left = p.slice(0, colon).trim();
-      const right = p.slice(colon + 1).trim().split(/\s+/)[0];
-      if (left === 'googlebot' || left === '*') out.push(right);
-    } else {
-      out.push(p.split(/\s+/)[0]);
-    }
-  }
-  return out;
-}
-
-function blockedFrom(chunks) {
-  const tokens = chunks.flatMap(tokensFrom);
-  return tokens.includes('noindex') || tokens.includes('none');
 }
 
 function collectTypes(node, out) {
@@ -112,11 +62,6 @@ function readJsonLd(html) {
   return { blocks, invalid, types: [...new Set(types)].slice(0, 8) };
 }
 
-function clip(s, n) {
-  const t = String(s || '');
-  return t.length > n ? `${t.slice(0, n - 1)}…` : t;
-}
-
 function issue(id, severity, url, detail) {
   return { id, severity, url, detail };
 }
@@ -126,10 +71,10 @@ function issue(id, severity, url, detail) {
  */
 export function extractPageSeo(html = '', url = '', headers = null) {
   const jsonLd = readJsonLd(html);
-  const doc = strip(html);
+  const doc = stripBoilerplate(html);
   const { robots, named, props } = scanMeta(doc);
-  const title = decode((doc.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || '');
-  const description = decode(named.description || '');
+  const title = decodeEntities((doc.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || '');
+  const description = decodeEntities(named.description || '');
   const href = linkHref(doc, 'canonical');
   let canonicalRelative = false;
   let canonicalOffsite = false;
@@ -141,7 +86,7 @@ export function extractPageSeo(html = '', url = '', headers = null) {
       canonicalOffsite = true;
     }
   }
-  const ogTitle = decode(props['og:title'] || '');
+  const ogTitle = decodeEntities(props['og:title'] || '');
   const ogImage = (props['og:image'] || '').trim();
   const h1Count = (doc.match(/<h1\b/gi) || []).length;
   return {
@@ -151,7 +96,7 @@ export function extractPageSeo(html = '', url = '', headers = null) {
     titleLength: title.length,
     descriptionLength: description.length,
     h1Count,
-    noindex: blockedFrom([...robots, header(headers, 'x-robots-tag')]),
+    noindex: isRobotsBlocked([...robots, headerValue(headers, 'x-robots-tag')]),
     lang: attr((doc.match(/<html\b[^>]*>/i) || [''])[0], 'lang') || '',
     hasOg: Boolean(ogTitle && ogImage),
     canonical: href,
@@ -218,11 +163,11 @@ export function summarizeSeo(pages = [], robotRules = null) {
   const titleGroups = dupGroups(list, 'title');
   const descGroups = dupGroups(list, 'description');
   for (const group of titleGroups) {
-    const shown = clip(group[0].title, 70);
+    const shown = clipText(group[0].title, 70);
     for (const p of group) issues.push(issue('seo-duplicate-title', 'warn', p.url, `Title "${shown}" is used on ${group.length} pages.`));
   }
   for (const group of descGroups) {
-    const shown = clip(group[0].description, 70);
+    const shown = clipText(group[0].description, 70);
     for (const p of group) issues.push(issue('seo-duplicate-description', 'warn', p.url, `Meta description "${shown}" is used on ${group.length} pages.`));
   }
 
@@ -239,7 +184,7 @@ export function summarizeSeo(pages = [], robotRules = null) {
     issues,
     pages: list.map((p) => ({
       url: p.url,
-      title: clip(p.title, 120),
+      title: clipText(p.title, 120),
       descriptionLength: p.descriptionLength || 0,
       indexable: p.indexable,
       h1Count: p.h1Count,
