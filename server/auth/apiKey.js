@@ -8,6 +8,9 @@ import {
   readBearerToken,
   readNamedCookie,
 } from './keyParse.js';
+import {
+  authViaLogiInk, logiInkKeyMatches, readLogiInkApiKey,
+} from './logiInkAuth.js';
 
 const COOKIE = 'qazar_session';
 
@@ -31,11 +34,16 @@ export function readBearer(req) {
 }
 
 /**
- * A valid bearer key is scoped to its owner. A bad bearer is 401.
- * GitHub Pages calls the tunnel with no key and no cross-site cookie, so that
- * console stays signed in as the operator.
+ * Auth order: Logi-Ink x-api-key → bearer QAZAR key → operator cookie → Pages.
+ * A presented but invalid Logi-Ink or bearer secret is 401.
  */
 export function attachAuth(req, res, next) {
+  const logiKey = readLogiInkApiKey(req);
+  if (logiKey) {
+    if (!logiInkKeyMatches(logiKey)) return res.status(401).json({ error: 'Unauthorized' });
+    req.auth = authViaLogiInk();
+    return next();
+  }
   const bearer = readBearer(req);
   if (bearer) {
     const key = loadApiKeys().find((item) => timingSafeEqual(item.secret, bearer));

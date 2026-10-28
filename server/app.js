@@ -9,6 +9,7 @@ import { runsRouter } from './routes/runs.js';
 import { shareRouter } from './routes/share.js';
 import { artifactHandler } from './routes/artifacts.js';
 import { attachAuth, operatorToken, setOperatorCookie } from './auth/apiKey.js';
+import { requirePartnerOrOperatorOnPost } from './auth/logiInkAuth.js';
 import { accountHandler, checkoutHandler, webhookHandler } from './billing/stripeBilling.js';
 import { timingSafeEqual } from './util/timingSafeEqual.js';
 import { getLocalIp } from './util/localIp.js';
@@ -57,7 +58,7 @@ export function createApp() {
 
   app.get('/api/billing/account', attachAuth, accountHandler);
   app.post('/api/billing/checkout', attachAuth, billingByKey, checkoutHandler);
-  app.use('/api/runs', attachAuth, readByIp, postByIp, postByKey, runsRouter);
+  app.use('/api/runs', attachAuth, requirePartnerOrOperatorOnPost, readByIp, postByIp, postByKey, runsRouter);
   app.use('/api/share', shareByIp, shareRouter);
   app.use('/api/artifacts', attachAuth, readByIp, artifactHandler);
 

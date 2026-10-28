@@ -1,5 +1,6 @@
 import { generatePdfReport } from '../report/pdfReport.js';
 import { renderReportPdf } from '../report/renderPdf.js';
+import { resolveAgencyBrand, resolveAgencyInbox } from '../report/mailer.js';
 import { sendReport } from '../mail/sendReport.js';
 import { storage } from '../storage/storageAdapter.js';
 import { save } from '../storage/runStore.js';
@@ -18,9 +19,10 @@ async function clearEmailError(run) {
 
 async function ensurePdf(run) {
   if (storage.hasArtifact(run.id, 'report.pdf')) return;
-  const agency = process.env.AGENCY_INBOX || 'consulting@qazar.dev';
-  const html = generatePdfReport(run, agency);
-  await renderReportPdf(html, run.id, { agency, domain: run.input?.domain || '' });
+  const leadEmail = resolveAgencyInbox() || 'consulting@qazar.dev';
+  const brand = resolveAgencyBrand();
+  const html = generatePdfReport(run, leadEmail, { agency: brand });
+  await renderReportPdf(html, run.id, { agency: brand, domain: run.input?.domain || '' });
 }
 
 /** Write the PDF and send mail. Mail failure enqueues a retry and does not recrawl. */
