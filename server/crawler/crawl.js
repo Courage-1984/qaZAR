@@ -1,15 +1,16 @@
-import { normalizeUrl, isAssetUrl, sameOrigin, sameHost } from './normalize.js';
+import { normalizeUrl, isAssetUrl, sameOrigin } from './normalize.js';
 import { collectSitemapUrls, discoverSitemaps } from './sitemap.js';
 import { extractLinksHeadless } from './headlessCrawl.js';
 import { selectTopRoiCandidates } from './roiScorer.js';
 import { extractCrawlSignals, aggregateSiteProfile } from './siteProfiler.js';
-import { summarizeSeo } from './seo.js';
 import { parseRobotsTxt, isUrlAllowed } from './robots.js';
 import { fetchPublic, fetchPublicText, readCapped } from './safeFetch.js';
 import { config } from '../config.js';
 import { drainWaves } from '../util/batch.js';
 import { waitForHost } from './hostGate.js';
 import { emptyCrawlProfile } from './crawlProfile.js';
+import { emptyRobotRules, robotsLoadMiss, robotsLoadOk } from './crawlRobots.js';
+import { filterAllowedHostUrls, seoForSelected } from './crawlSelect.js';
 
 /** Extract same-origin hrefs from HTML (regex; fast for static discovery). */
 export function extractLinks(html, baseUrl) {
@@ -25,7 +26,7 @@ export function extractLinks(html, baseUrl) {
  * Breadth-first crawl from a starting URL.
  * Extracts lightweight performance, tech stack, and lead signals on the fly.
  */
-async function bfs(start, max, { renderJs = false, onProgress, robotRules = { disallows: [], allows: [] }, concurrency = config.crawlConcurrency } = {}) {
+async function bfs(start, max, { renderJs = false, onProgress, robotRules = emptyRobotRules(), concurrency = config.crawlConcurrency } = {}) {
   const seen = new Set([start]);
   const queue = [start];
   const discovered = [];
@@ -86,21 +87,16 @@ async function bfs(start, max, { renderJs = false, onProgress, robotRules = { di
   const urls = selectTopRoiCandidates(discovered, max);
   onProgress?.('crawling:profiling', `Aggregating site tech & lead profile...`);
   const siteProfile = aggregateSiteProfile(pageSignals, brokenLinks);
-  const selected = new Set(urls);
-  siteProfile.seo = summarizeSeo(
-    pageSignals.filter((s) => selected.has(s.url)).map((s) => s.seo),
-    robotRules,
-  );
+  siteProfile.seo = seoForSelected(pageSignals, urls, robotRules);
   return { urls, siteProfile };
 }
 
 async function loadRobots(origin) {
   try {
     const { text } = await fetchPublicText(`${origin}/robots.txt`, { timeout: 5000, label: 'robots' });
-    const parsed = parseRobotsTxt(text);
-    return { hasRobotsTxt: true, robotRules: { disallows: parsed.disallows, allows: parsed.allows, crawlDelay: parsed.crawlDelay || 0 } };
+    return robotsLoadOk(parseRobotsTxt(text));
   } catch {
-    return { hasRobotsTxt: false, robotRules: { disallows: [], allows: [], crawlDelay: 0 } };
+    return robotsLoadMiss();
   }
 }
 
@@ -136,7 +132,7 @@ export async function buildQueue({ domain, sitemap_url, max_pages = 10, renderJs
     if (sitemapUrls.length >= max_pages * 2) break;
   }
 
-  const uniq = [...new Set(sitemapUrls)].filter((u) => sameHost(u, start) && isUrlAllowed(u, robotRules));
+  const uniq = filterAllowedHostUrls(sitemapUrls, start, robotRules);
   if (uniq.length) {
     onProgress?.('crawling:prioritizing', `Prioritizing top ${max_pages} ROI URLs from sitemap...`);
     const prioritized = selectTopRoiCandidates(uniq, max_pages);
