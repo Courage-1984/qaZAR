@@ -3,6 +3,8 @@
  * Consecutive User-agent lines form one group. Allow wins on an equal or longer match.
  */
 
+import { isRobotsRuleField, robotsLineParts } from './robotsLine.js';
+
 export function appliesToQazar(ua) {
   const name = String(ua).toLowerCase();
   return name === '*' || name.includes('qazar');
@@ -23,16 +25,15 @@ export function parseRobotsTxt(content = '') {
   let inRules = false;
 
   for (const rawLine of String(content).split('\n')) {
-    const line = rawLine.split('#')[0].trim();
-    if (!line) {
+    const blank = !String(rawLine || '').split('#')[0].trim();
+    if (blank) {
       agents = [];
       inRules = false;
       continue;
     }
-    const idx = line.indexOf(':');
-    if (idx < 0) continue;
-    const field = line.slice(0, idx).trim().toLowerCase();
-    const val = line.slice(idx + 1).trim();
+    const parts = robotsLineParts(rawLine);
+    if (!parts) continue;
+    const { field, val } = parts;
 
     if (field === 'user-agent') {
       if (inRules) agents = [];
@@ -44,7 +45,7 @@ export function parseRobotsTxt(content = '') {
       if (val) sitemaps.push(val);
       continue;
     }
-    if (field !== 'disallow' && field !== 'allow' && field !== 'crawl-delay') continue;
+    if (!isRobotsRuleField(field)) continue;
     inRules = true;
     if (!agents.some(appliesToQazar)) continue;
     if (field === 'disallow' && val) disallows.push(val);

@@ -8,6 +8,7 @@ import {
 import {
   formatSseData, listRunSummary, newRunRecord, runEventPayload,
 } from './runRecord.js';
+import { filterRunsByOwner, runVisibleToOwner, sortRunsNewestFirst } from './runOwnership.js';
 
 /**
  * Run index in SQLite or Postgres, with run.json kept beside the screenshots.
@@ -46,9 +47,7 @@ class SqlRunStore {
 
   async get(id, { ownerId = null } = {}) {
     const run = await readRun(id);
-    if (!run) return null;
-    if (ownerId && run.ownerId !== ownerId) return null;
-    return run;
+    return runVisibleToOwner(run, ownerId) ? run : null;
   }
 
   async getByShareToken(token) {
@@ -57,11 +56,8 @@ class SqlRunStore {
   }
 
   async list({ ownerId = null } = {}) {
-    let list = await listRunPayloads();
-    if (ownerId) list = list.filter((r) => r.ownerId === ownerId);
-    return list
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map(listRunSummary);
+    const list = filterRunsByOwner(await listRunPayloads(), ownerId);
+    return sortRunsNewestFirst(list).map(listRunSummary);
   }
 
   async save(run) {
@@ -73,8 +69,7 @@ class SqlRunStore {
 
   async delete(id, { ownerId = null } = {}) {
     const run = await readRun(id);
-    if (!run) return false;
-    if (ownerId && run.ownerId !== ownerId) return false;
+    if (!runVisibleToOwner(run, ownerId)) return false;
     await deleteRunRow(id);
     storage.deleteRunArtifacts(id);
     this.events.delete(id);
