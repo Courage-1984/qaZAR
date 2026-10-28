@@ -6,64 +6,47 @@ import {
 import { headerValue } from './htmlBits.js';
 import { pathHasContact, pathHasPricing, scoreSecurity } from './securityScore.js';
 import { absorbPageSignal, emptyAggregateProfile, unmeasuredProfile } from './profileAggregate.js';
+import {
+  codeHygieneOf,
+  countWebFonts,
+  hasLeadForm,
+  insecureFormCount,
+  readPageMeta,
+  securityFromUrlHeaders,
+} from './pageHygiene.js';
 
 export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, headers = null) {
   const getH = (name) => headerValue(headers, name) || null;
-  const funnelUrl = classifyFunnelUrl(url);
+  const meta = readPageMeta(html);
+  const leads = extractLeads(html, url);
 
-  const signals = {
+  return {
     url,
     responseTimeMs,
     htmlSizeBytes: Buffer.byteLength(html, 'utf8'),
-    hasViewportMeta: false,
-    hasTitle: false,
-    hasDescription: false,
-    hasOpenGraph: false,
+    ...meta,
     techStack: detectTechStack(html),
-    security: {
-      isHttps: url.startsWith('https:'),
-      hasHsts: Boolean(getH('strict-transport-security')),
-      hasCsp: Boolean(getH('content-security-policy')),
-      hasXFrame: Boolean(getH('x-frame-options')),
-    },
+    security: securityFromUrlHeaders(url, getH),
     performance: {
       compressed: Boolean(getH('content-encoding')),
       unlazyImages: countUnlazyImages(html),
       renderBlockingScripts: countBlockingHeadScripts(html),
-      webFonts: (html.match(/fonts\.(?:googleapis|gstatic)\.com|use\.typekit\.net/gi) || []).length,
+      webFonts: countWebFonts(html),
     },
     funnel: {
-      ...funnelUrl,
-      hasLeadForm: /<form[^>]*>[\s\S]*?<input[^>]*(?:type=["'](?:email|tel)["']|name=["'](?:email|phone|contact|lead)["'])[\s\S]*?<\/form>/i.test(html),
-      insecureForms: (url.startsWith('https:') && /<form[^>]*action=["']http:\/\//i.test(html)) ? 1 : 0,
+      ...classifyFunnelUrl(url),
+      hasLeadForm: hasLeadForm(html),
+      insecureForms: insecureFormCount(url, html),
     },
     contacts: {
-      emails: [],
-      phones: [],
-      socials: [],
+      emails: leads.emails,
+      phones: leads.phones,
+      socials: leads.socials,
     },
-    codeHygiene: {
-      legacyTags: (html.match(/<(?:center|font|marquee|blink)\b/gi) || []).length,
-      missingAltImages: (html.match(/<img(?![^>]*\balt\s*=)[^>]*>/gi) || []).length,
-      hasFavicon: /<link\s[^>]*rel\s*=\s*["'](?:shortcut )?icon["']/i.test(html),
-    },
+    codeHygiene: codeHygieneOf(html),
+    leads,
+    seo: extractPageSeo(html, url, headers),
   };
-
-  // 1. Meta & SEO hygiene
-  signals.hasViewportMeta = /<meta\s[^>]*name\s*=\s*["']viewport["']/i.test(html);
-  signals.hasTitle = /<title[^>]*>[\s\S]+?<\/title>/i.test(html);
-  signals.hasDescription = /<meta\s[^>]*name\s*=\s*["']description["']/i.test(html);
-  signals.hasOpenGraph = /<meta\s[^>]*property\s*=\s*["']og:image["']/i.test(html) && /<meta\s[^>]*property\s*=\s*["']og:title["']/i.test(html);
-  signals.hasCanonical = /<link\s[^>]*rel\s*=\s*["']canonical["']/i.test(html);
-
-  const leads = extractLeads(html, url);
-  signals.leads = leads;
-  signals.contacts.emails = leads.emails;
-  signals.contacts.phones = leads.phones;
-  signals.contacts.socials = leads.socials;
-  signals.seo = extractPageSeo(html, url, headers);
-
-  return signals;
 }
 
 export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
