@@ -8,12 +8,13 @@ import { reviewFindings } from '../report/findingReview.js';
 import { reportDownloadName } from '../report/reportMeta.js';
 import { assertInflight } from '../quota/enforce.js';
 import { storage } from '../storage/storageAdapter.js';
+import { createOwnerId, ownerScopeFromAuth } from '../http/authScope.js';
 import fs from 'node:fs';
 
 export const runsRouter = Router();
 
 function scope(req) {
-  return req.auth?.via === 'key' ? req.auth.ownerId : null;
+  return ownerScopeFromAuth(req.auth);
 }
 
 async function owned(req, id) {
@@ -27,7 +28,7 @@ runsRouter.post('/', async (req, res) => {
       publicCaller: Boolean(req.auth?.publicCaller),
       pageCap: limits.pageCap,
     });
-    const run = await createRun(input, { ownerId: req.auth?.ownerId || 'operator' });
+    const run = await createRun(input, { ownerId: createOwnerId(req.auth) });
     await enqueue(run.id, 'audit');
     res.status(202).json({ runId: run.id, shareToken: run.shareToken });
   } catch (e) {

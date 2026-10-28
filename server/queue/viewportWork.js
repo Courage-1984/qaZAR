@@ -5,15 +5,16 @@ import { capturePage } from '../engine/capturePage.js';
 import { absorbRendered } from '../crawler/absorb.js';
 import { baselinePath, hasBaseline, promote } from '../visual/baseline.js';
 import { diffImages } from '../visual/diff.js';
-import { captureDiffStatus } from '../visual/diffMetrics.js';
 import { runPath } from '../storage/runStore.js';
 import { siteHash, storage } from '../storage/storageAdapter.js';
 import { touchBaseline } from '../storage/db.js';
 import { firstLine } from '../util/firstLine.js';
+import { viewportTimingLine } from '../engine/captureResult.js';
 import { crossViewportViolations } from './crossViewport.js';
 import {
-  asPosixRel, emptyViewportRecord, viewportCaptureOptions, viewportShotRels,
+  emptyViewportRecord, viewportCaptureOptions, viewportShotRels,
 } from './viewportPaths.js';
+import { applyCaptureSuccess, applyDiffSuccess, deskViewportRec } from './viewportApply.js';
 
 export async function processViewport(run, page, vp) {
   const dir = runPath(run.id);
@@ -37,14 +38,10 @@ export async function processViewport(run, page, vp) {
       delete res.leadHtml;
     }
     if (res.timings) {
-      const m = res.timings;
-      console.log(`qaZAR viewport ${vp.name} goto=${m.gotoMs} idle=${m.idleMs} scroll=${m.scrollMs} fonts=${m.fontMs} shot=${m.shotMs}`);
+      console.log(viewportTimingLine(vp.name, res.timings));
       delete res.timings;
     }
-    rec.shot = asPosixRel(rels.shot);
-    rec.violations = res.violations;
-    rec.metrics = res.metrics;
-    if (res.partial) rec.partial = true;
+    applyCaptureSuccess(rec, res, rels.shot);
 
     const domain = run.input.domain;
     const ownerId = run.ownerId || 'operator';
@@ -56,11 +53,7 @@ export async function processViewport(run, page, vp) {
       fs.mkdirSync(path.dirname(path.join(dir, rels.diff)), { recursive: true });
       fs.copyFileSync(baselinePath(domain, page.slug, vp.name, ownerId), path.join(dir, rels.base));
       const d = diffImages(path.join(dir, rels.base), abs, path.join(dir, rels.diff));
-      rec.base = asPosixRel(rels.base);
-      rec.diff = asPosixRel(rels.diff);
-      rec.diffPercent = Number(d.diffPercent.toFixed(4));
-      rec.sizeChanged = d.sizeChanged;
-      rec.status = captureDiffStatus(d.diffPercent, d.sizeChanged, config.diffThresholdPercent);
+      applyDiffSuccess(rec, rels, d, config.diffThresholdPercent);
     }
     if (rec.shot) await storage.mirrorArtifact(run.id, rec.shot);
     await touchBaseline(siteHash(domain), ownerId);
@@ -71,7 +64,7 @@ export async function processViewport(run, page, vp) {
 }
 
 export function evaluateCrossViewport(page) {
-  const deskRec = page.viewports.desktop || page.viewports.fhd || page.viewports.ultrawide;
+  const deskRec = deskViewportRec(page.viewports);
   const mobRec = page.viewports.mobile;
   const tabRec = page.viewports.tablet;
   if (!deskRec?.metrics) return;

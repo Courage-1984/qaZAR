@@ -9,6 +9,7 @@ import { installNavGuard } from './navGuard.js';
 import {
   FREEZE_CSS, LEAD_HTML_CAP, captureBudgets, screenshotOptions,
 } from './captureBudgets.js';
+import { buildCapturePayload, captureTimings, isFontPartial } from './captureResult.js';
 
 let browserPromise;
 export async function getBrowser() {
@@ -104,7 +105,7 @@ export async function capturePage(url, vp, outFile, {
       new Promise((resolve) => setTimeout(() => resolve('cap'), cap)),
     ]), fontCapMs);
     const fontMs = mark() - t;
-    const partial = fontWait === 'cap';
+    const partial = isFontPartial(fontWait);
     if (settleMs) await page.waitForTimeout(settleMs);
 
     const result = await page.evaluate(evaluate, { touch: vp.touch, viewportWidth: vp.width });
@@ -118,9 +119,12 @@ export async function capturePage(url, vp, outFile, {
     await page.screenshot(screenshotOptions(outFile, {
       height, width: vp.width, maxShotHeight: config.maxShotHeight,
     }));
-    const timings = { gotoMs, idleMs, scrollMs, fontMs, shotMs: mark() - t };
-    const payload = { ...result, timings, partial };
-    return leadHtml ? { ...payload, leadHtml } : payload;
+    return buildCapturePayload(
+      result,
+      captureTimings({ gotoMs, idleMs, scrollMs, fontMs, shotMs: mark() - t }),
+      partial,
+      leadHtml,
+    );
   } finally {
     await context.close();
   }
