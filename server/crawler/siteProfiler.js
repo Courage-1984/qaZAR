@@ -4,6 +4,7 @@ import {
   classifyFunnelUrl, countBlockingHeadScripts, countUnlazyImages, detectTechStack,
 } from './techStack.js';
 import { headerValue } from './htmlBits.js';
+import { pathHasContact, pathHasPricing, scoreSecurity } from './securityScore.js';
 
 export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, headers = null) {
   const getH = (name) => headerValue(headers, name) || null;
@@ -152,12 +153,12 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
     profile.funnel.hasContact = true;
   }
 
-  if (!profile.security.isHttps) { profile.security.score -= 40; profile.security.flags.push('Insecure HTTP'); }
-  if (!profile.security.hasHsts) { profile.security.score -= 20; profile.security.flags.push('Missing HSTS'); }
-  if (!profile.security.hasCsp) { profile.security.score -= 15; profile.security.flags.push('Missing CSP'); }
-  if (profile.funnel.insecureFormsCount > 0) { profile.security.score -= 20; profile.security.flags.push('Insecure Form Submission'); }
-  profile.security.score = Math.max(0, profile.security.score);
-  profile.security.measured = true;
+  const security = scoreSecurity({
+    isHttps: profile.security.isHttps,
+    hasHsts: profile.security.hasHsts,
+    hasCsp: profile.security.hasCsp,
+    insecureFormsCount: profile.funnel.insecureFormsCount,
+  });
 
   profile.avgResponseTimeMs = Math.round(totalTime / pageSignals.length);
   profile.responseMeasured = true;
@@ -175,8 +176,8 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
     phones: [...profile.leadContacts.phones],
     bookingLinks,
     hasLeadForm: profile.funnel.hasLeadForm,
-    hasContact: pages.some((p) => /\/(contact|team|book(?:ing)?|demo)\b/i.test(p)),
-    hasPricing: profile.funnel.hasPricing || pages.some((p) => /\b(pricing|plans)\b/i.test(p)),
+    hasContact: pages.some(pathHasContact),
+    hasPricing: profile.funnel.hasPricing || pages.some(pathHasPricing),
   });
 
   return {
@@ -196,8 +197,8 @@ export function aggregateSiteProfile(pageSignals = [], brokenLinks = []) {
     responseMeasured: true,
     security: {
       isHttps: profile.security.isHttps,
-      score: profile.security.score,
-      flags: profile.security.flags,
+      score: security.score,
+      flags: security.flags,
       measured: true,
     },
     assetHygiene: profile.assetHygiene,

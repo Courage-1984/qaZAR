@@ -14,6 +14,7 @@ import {
   pushContact,
   roleNear,
 } from './leadParse.js';
+import { pathHasContact, pathHasPricing } from './securityScore.js';
 
 export function normalizePhone(raw) {
   return phoneDigits(raw);
@@ -154,8 +155,8 @@ export function unionLeads(profile, leads, url = '') {
     phones: lc.phones,
     bookingLinks: profile.bookingLinks,
     hasLeadForm: Boolean(profile.funnel?.hasLeadForm),
-    hasContact: pages.some((p) => /\/(contact|team|book(?:ing)?|demo)\b/i.test(p || '')),
-    hasPricing: Boolean(profile.funnel?.hasPricing) || pages.some((p) => /\b(pricing|plans)\b/i.test(p || '')),
+    hasContact: pages.some(pathHasContact),
+    hasPricing: Boolean(profile.funnel?.hasPricing) || pages.some(pathHasPricing),
   });
   return profile;
 }
