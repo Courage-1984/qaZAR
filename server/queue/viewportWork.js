@@ -8,6 +8,8 @@ import { diffImages } from '../visual/diff.js';
 import { runPath } from '../storage/runStore.js';
 import { siteHash, storage } from '../storage/storageAdapter.js';
 import { touchBaseline } from '../storage/db.js';
+import { firstLine } from '../util/firstLine.js';
+import { crossViewportViolations } from './crossViewport.js';
 
 export async function processViewport(run, page, vp) {
   const dir = runPath(run.id);
@@ -66,75 +68,31 @@ export async function processViewport(run, page, vp) {
     await touchBaseline(siteHash(domain), ownerId);
   } catch (e) {
     rec.status = 'error';
-    rec.error = String(e.message || e).split('\n')[0];
+    rec.error = firstLine(e);
   }
 }
 
 export function evaluateCrossViewport(page) {
-  const deskRec = page.viewports['desktop'] || page.viewports['fhd'] || page.viewports['ultrawide'];
-  const mobRec = page.viewports['mobile'];
-  const tabRec = page.viewports['tablet'];
+  const deskRec = page.viewports.desktop || page.viewports.fhd || page.viewports.ultrawide;
+  const mobRec = page.viewports.mobile;
+  const tabRec = page.viewports.tablet;
   if (!deskRec?.metrics) return;
 
-  const deskH1 = deskRec.metrics.headings?.h1;
-  const deskH2 = deskRec.metrics.headings?.h2;
+  const { tablet, mobile } = crossViewportViolations({
+    deskH1: deskRec.metrics.headings?.h1,
+    deskH2: deskRec.metrics.headings?.h2,
+    tabH1: tabRec?.metrics?.headings?.h1,
+    mobH1: mobRec?.metrics?.headings?.h1,
+    mobH2: mobRec?.metrics?.headings?.h2,
+    mobBody: mobRec?.metrics?.bodyFont || 16,
+  });
 
-  if (tabRec?.metrics && deskH1) {
-    const tabH1 = tabRec.metrics.headings?.h1;
-    if (tabH1 && tabH1 > deskH1 + 4) {
-      tabRec.violations = tabRec.violations || [];
-      tabRec.violations.push({
-        rule: 'heading-scale-inverted',
-        severity: 'info',
-        selector: 'h1',
-        rect: null,
-        detail: `Tablet H1 (${tabH1}px) exceeds desktop H1 (${deskH1}px) indicating breakpoint style inversion`,
-      });
-    }
+  if (tablet.length && tabRec) {
+    tabRec.violations = tabRec.violations || [];
+    tabRec.violations.push(...tablet);
   }
-
-  if (mobRec?.metrics) {
-    const mobH1 = mobRec.metrics.headings?.h1;
-    const mobH2 = mobRec.metrics.headings?.h2;
-    const mobBody = mobRec.metrics.bodyFont || 16;
-
-    if (deskH1 && mobH1) {
-      if (mobH1 > deskH1 + 4) {
-        mobRec.violations.push({
-          rule: 'heading-scale-inverted',
-          severity: 'info',
-          selector: 'h1',
-          rect: null,
-          detail: `Mobile H1 (${mobH1}px) exceeds desktop H1 (${deskH1}px) indicating breakpoint style inversion`,
-        });
-      } else if (deskH1 > 28 && mobH1 >= deskH1) {
-        mobRec.violations.push({
-          rule: 'heading-scale-static',
-          severity: 'info',
-          selector: 'h1',
-          rect: null,
-          detail: `H1 size (${mobH1}px) does not scale down on mobile (390px) from desktop (${deskH1}px)`,
-        });
-      }
-      if (mobH1 <= mobBody) {
-        mobRec.violations.push({
-          rule: 'heading-scale-undersized',
-          severity: 'info',
-          selector: 'h1',
-          rect: null,
-          detail: `H1 size (${mobH1}px) is less than or equal to base body font (${mobBody}px) on mobile`,
-        });
-      }
-    }
-
-    if (deskH2 && mobH2 && deskH2 > 24 && mobH2 >= deskH2) {
-      mobRec.violations.push({
-        rule: 'heading-scale-static',
-        severity: 'info',
-        selector: 'h2',
-        rect: null,
-        detail: `H2 size (${mobH2}px) does not scale down on mobile (390px) from desktop (${deskH2}px)`,
-      });
-    }
+  if (mobile.length && mobRec) {
+    mobRec.violations = mobRec.violations || [];
+    mobRec.violations.push(...mobile);
   }
 }
