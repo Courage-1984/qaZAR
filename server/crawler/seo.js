@@ -11,30 +11,7 @@ import {
   canonicalFlags, dupGroups, pageIssues, scoreSeoPages, seoIssue,
 } from './seoIssues.js';
 import { readSeoJsonLd } from './seoJsonLd.js';
-
-function scanMeta(html) {
-  const robots = [];
-  const named = {};
-  const props = {};
-  for (const tag of html.matchAll(/<meta\b[^>]*>/gi)) {
-    const t = tag[0];
-    const content = attr(t, 'content') ?? '';
-    const name = (attr(t, 'name') || '').toLowerCase();
-    const prop = (attr(t, 'property') || '').toLowerCase();
-    if (name === 'robots' || name === 'googlebot') robots.push(content);
-    if (name && named[name] == null) named[name] = content;
-    if (prop && props[prop] == null) props[prop] = content;
-  }
-  return { robots, named, props };
-}
-
-function linkHref(html, rel) {
-  for (const tag of html.matchAll(/<link\b[^>]*>/gi)) {
-    const rels = (attr(tag[0], 'rel') || '').toLowerCase().split(/\s+/);
-    if (rels.includes(rel)) return attr(tag[0], 'href') || '';
-  }
-  return null;
-}
+import { linkHref, scanMeta } from './seoMeta.js';
 
 /**
  * @returns {object} per-page search fields

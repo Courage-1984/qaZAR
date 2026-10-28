@@ -3,6 +3,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { config } from '../config.js';
 import { inflightStatusSql } from './inflightStatus.js';
+import { coreTablesDdl } from './schemaDdl.js';
 
 let db;
 let dbFile = '';
@@ -31,36 +32,7 @@ function schema(database) {
   database.exec(`
     PRAGMA journal_mode = WAL;
     PRAGMA busy_timeout = 5000;
-    CREATE TABLE IF NOT EXISTS runs (
-      id TEXT PRIMARY KEY,
-      owner_id TEXT NOT NULL,
-      share_token TEXT NOT NULL UNIQUE,
-      status TEXT NOT NULL,
-      payload TEXT NOT NULL,
-      lease_until INTEGER
-    );
-    CREATE TABLE IF NOT EXISTS jobs (
-      id TEXT PRIMARY KEY,
-      run_id TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      status TEXT NOT NULL,
-      available_at INTEGER NOT NULL,
-      lease_until INTEGER,
-      attempts INTEGER NOT NULL DEFAULT 0,
-      last_error TEXT,
-      worker_id TEXT
-    );
-    CREATE TABLE IF NOT EXISTS owners (
-      owner_id TEXT PRIMARY KEY,
-      tier TEXT NOT NULL DEFAULT 'free',
-      stripe_customer_id TEXT
-    );
-    CREATE TABLE IF NOT EXISTS baseline_meta (
-      owner_id TEXT NOT NULL,
-      site_hash TEXT NOT NULL,
-      updated_at INTEGER NOT NULL,
-      PRIMARY KEY (owner_id, site_hash)
-    );
+    ${coreTablesDdl('INTEGER')}
   `);
   migrateBaselineMeta(database);
 }
