@@ -4,11 +4,10 @@
  */
 
 import { captureCoverage } from './captureCoverage.js';
-import {
-  categoryBucket, compareClusters, defectClusterKey, emptyCategories, normalizeSelector,
-} from './defectCluster.js';
 import { profileFacts } from './profileFacts.js';
 import { generateActionRoadmap } from './actionRoadmap.js';
+import { materializeClusters, observeViolation } from './clusterFold.js';
+import { healthMetricsFromClusters } from './healthMetrics.js';
 
 export { generateActionRoadmap };
 
@@ -19,74 +18,26 @@ export { generateActionRoadmap };
 export function clusterDefects(run) {
   const map = new Map();
   const totalPages = run.pages?.length || 1;
-
   for (const page of run.pages || []) {
     for (const [vp, rec] of Object.entries(page.viewports || {})) {
       for (const v of rec.violations || []) {
-        const key = defectClusterKey(v);
-        let item = map.get(key);
-        if (!item) {
-          const normalizedSel = normalizeSelector(v.selector);
-          item = {
-            rule: v.rule,
-            severity: v.severity,
-            selector: normalizedSel || v.selector || null,
-            detail: v.detail,
-            pages: new Set(),
-            viewports: new Set(),
-            count: 0,
-          };
-          map.set(key, item);
-        }
-        item.pages.add(page.url);
-        item.viewports.add(vp);
-        item.count++;
+        observeViolation(map, v, page.url, vp);
       }
     }
   }
-
-  const clusters = [...map.values()].map((c) => ({
-    rule: c.rule,
-    severity: c.severity,
-    selector: c.selector,
-    detail: c.detail,
-    pagesCount: c.pages.size,
-    testedPages: totalPages,
-    viewports: [...c.viewports],
-    totalOccurrences: c.count,
-    observed: `observed on ${c.pages.size} of ${totalPages} page(s)`,
-  }));
-
-  clusters.sort(compareClusters);
-  return clusters;
+  return materializeClusters(map, totalPages);
 }
 
 export function calculateHealthScore(run) {
   const clusters = clusterDefects(run);
-  const confirmed = clusters.filter((c) => c.severity === 'error' || c.severity === 'warn');
-  const errorClusters = confirmed.filter((c) => c.severity === 'error');
-  const warnClusters = confirmed.filter((c) => c.severity === 'warn');
-  const rawErrors = errorClusters.reduce((acc, c) => acc + c.totalOccurrences, 0);
-  const rawWarnings = warnClusters.reduce((acc, c) => acc + c.totalOccurrences, 0);
-  const categories = emptyCategories();
-  for (const c of confirmed) {
-    const bucket = categoryBucket(c.rule);
-    if (bucket) categories[bucket] += c.totalOccurrences;
-  }
   const coverage = captureCoverage(run);
+  const { metrics, categories } = healthMetricsFromClusters(
+    clusters,
+    coverage,
+    run.pages?.length || 0,
+  );
   return {
-    metrics: {
-      totalPages: run.pages?.length || 0,
-      totalCaptures: coverage.completed,
-      attempted: coverage.attempted,
-      failedCaptures: coverage.failed,
-      coverageLine: coverage.line,
-      distinctErrors: errorClusters.length,
-      distinctWarnings: warnClusters.length,
-      rawErrors,
-      rawWarnings,
-      categories,
-    },
+    metrics,
     clusters,
     omitted: 0,
     facts: profileFacts(run.siteProfile),
