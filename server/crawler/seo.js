@@ -7,8 +7,9 @@ import { isUrlAllowed } from './robots.js';
 import {
   attr, clipText, decodeEntities, headerValue, isRobotsBlocked, stripBoilerplate,
 } from './htmlBits.js';
-
-const VAGUE = new Set(['home', 'index', 'untitled', 'welcome', 'profile']);
+import {
+  canonicalFlags, dupGroups, pageIssues, scoreSeoPages, seoIssue,
+} from './seoIssues.js';
 
 function scanMeta(html) {
   const robots = [];
@@ -62,10 +63,6 @@ function readJsonLd(html) {
   return { blocks, invalid, types: [...new Set(types)].slice(0, 8) };
 }
 
-function issue(id, severity, url, detail) {
-  return { id, severity, url, detail };
-}
-
 /**
  * @returns {object} per-page search fields
  */
@@ -76,16 +73,7 @@ export function extractPageSeo(html = '', url = '', headers = null) {
   const title = decodeEntities((doc.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [])[1] || '');
   const description = decodeEntities(named.description || '');
   const href = linkHref(doc, 'canonical');
-  let canonicalRelative = false;
-  let canonicalOffsite = false;
-  if (href) {
-    canonicalRelative = !/^https?:\/\//i.test(href);
-    try {
-      canonicalOffsite = new URL(href, url).host !== new URL(url).host;
-    } catch {
-      canonicalOffsite = true;
-    }
-  }
+  const { canonicalRelative, canonicalOffsite } = canonicalFlags(href, url);
   const ogTitle = decodeEntities(props['og:title'] || '');
   const ogImage = (props['og:image'] || '').trim();
   const h1Count = (doc.match(/<h1\b/gi) || []).length;
@@ -108,45 +96,6 @@ export function extractPageSeo(html = '', url = '', headers = null) {
   };
 }
 
-function norm(s) {
-  return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
-}
-
-function dupGroups(list, field) {
-  const map = new Map();
-  for (const p of list) {
-    const key = norm(p[field]);
-    if (!key) continue;
-    const bucket = map.get(key);
-    if (bucket) bucket.push(p);
-    else map.set(key, [p]);
-  }
-  return [...map.values()].filter((g) => g.length > 1);
-}
-
-function pageIssues(p) {
-  const out = [];
-  if (p.disallowed) out.push(issue('seo-robots-disallow', 'error', p.url, 'robots.txt disallows this URL, so Google may title it from other sites.'));
-  if (p.noindex) out.push(issue('seo-noindex', 'error', p.url, 'noindex or none is set, so this page can be kept out of search results.'));
-  if (!p.title) out.push(issue('seo-missing-title', 'error', p.url, 'Page has no title element.'));
-  else if (VAGUE.has(p.title.toLowerCase())) out.push(issue('seo-vague-title', 'warn', p.url, `Title "${p.title}" does not describe the page.`));
-  else if (p.titleLength > 60) out.push(issue('seo-title-long', 'info', p.url, `Title is ${p.titleLength} characters and may be truncated.`));
-  if (!p.description) out.push(issue('seo-missing-description', 'warn', p.url, 'Page has no meta description.'));
-  else if (p.descriptionLength > 160) out.push(issue('seo-description-long', 'info', p.url, `Description is ${p.descriptionLength} characters and may be truncated.`));
-  if (!p.h1Count) out.push(issue('seo-missing-h1', 'warn', p.url, 'Page has no H1. Google may use one when it rewrites the title link.'));
-  else if (p.h1Count > 1) out.push(issue('seo-multiple-h1', 'info', p.url, `Page has ${p.h1Count} H1 elements.`));
-  if (!p.canonical) out.push(issue('seo-missing-canonical', 'info', p.url, 'Page has no canonical link.'));
-  else {
-    if (p.canonicalRelative) out.push(issue('seo-canonical-relative', 'info', p.url, 'Canonical URL is not absolute.'));
-    if (p.canonicalOffsite) out.push(issue('seo-canonical-offsite', 'info', p.url, 'Canonical URL points at a different host.'));
-  }
-  if (p.jsonLdInvalid) out.push(issue('seo-jsonld-invalid', 'warn', p.url, 'JSON-LD block is not valid JSON.'));
-  else if (!p.hasJsonLd) out.push(issue('seo-jsonld-missing', 'info', p.url, 'Page has no JSON-LD structured data.'));
-  if (!p.lang) out.push(issue('seo-missing-lang', 'info', p.url, 'html element has no lang attribute.'));
-  if (!p.hasOg) out.push(issue('seo-missing-og', 'info', p.url, 'Missing og:title or og:image.'));
-  return out;
-}
-
 /**
  * Score and list issues for the pages that will be captured.
  * robotRules is { disallows, allows } from parseRobotsTxt. Null skips the disallow check.
@@ -164,23 +113,15 @@ export function summarizeSeo(pages = [], robotRules = null) {
   const descGroups = dupGroups(list, 'description');
   for (const group of titleGroups) {
     const shown = clipText(group[0].title, 70);
-    for (const p of group) issues.push(issue('seo-duplicate-title', 'warn', p.url, `Title "${shown}" is used on ${group.length} pages.`));
+    for (const p of group) issues.push(seoIssue('seo-duplicate-title', 'warn', p.url, `Title "${shown}" is used on ${group.length} pages.`));
   }
   for (const group of descGroups) {
     const shown = clipText(group[0].description, 70);
-    for (const p of group) issues.push(issue('seo-duplicate-description', 'warn', p.url, `Meta description "${shown}" is used on ${group.length} pages.`));
+    for (const p of group) issues.push(seoIssue('seo-duplicate-description', 'warn', p.url, `Meta description "${shown}" is used on ${group.length} pages.`));
   }
 
-  let score = 100;
-  const blocked = list.filter((p) => p.noindex || p.disallowed).length;
-  score -= Math.min(50, blocked * 25);
-  score -= list.filter((p) => !p.title).length * 20 + titleGroups.length * 10;
-  score -= list.filter((p) => !p.description).length * 8 + descGroups.length * 5;
-  score -= list.filter((p) => !p.h1Count).length * 5 + list.filter((p) => p.jsonLdInvalid).length * 8;
-  score = Math.max(20, Math.min(100, score));
-
   return {
-    score,
+    score: scoreSeoPages(list, titleGroups.length, descGroups.length),
     issues,
     pages: list.map((p) => ({
       url: p.url,

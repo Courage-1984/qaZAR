@@ -6,49 +6,20 @@
 import { isJunkEmail, phoneDigits, scoreLeadHeat } from './leadSignals.js';
 import {
   BOOKING_RE,
-  ROLE_HINTS,
   addUnique,
-  asStringList,
   cleanSocial,
   decodeLeadText,
   pushContact,
   roleNear,
 } from './leadParse.js';
 import { pathHasContact, pathHasPricing } from './securityScore.js';
+import { emptyLeadLdAcc, readLeadJsonLd } from './leadJsonLd.js';
 
 export function normalizePhone(raw) {
   return phoneDigits(raw);
 }
 
 export { scoreLeadHeat };
-
-function readJsonLd(html, acc) {
-  const re = /<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-  for (const match of html.matchAll(re)) {
-    try { walkLd(JSON.parse(match[1]), acc); } catch { /* invalid block */ }
-  }
-}
-
-function walkLd(node, acc, seen = new Set()) {
-  if (!node || typeof node !== 'object' || seen.has(node)) return;
-  seen.add(node);
-  if (Array.isArray(node)) {
-    for (const item of node) walkLd(item, acc, seen);
-    return;
-  }
-  const types = [].concat(node['@type'] || []).map((t) => String(t).toLowerCase());
-  const org = types.some((t) => t.includes('organization') || t.includes('localbusiness'));
-  const point = types.some((t) => t.includes('contactpoint'));
-  if (org && node.name && !acc.companyName) acc.companyName = decodeLeadText(node.name);
-  const role = point ? (ROLE_HINTS.find((r) => String(node.name || '').toLowerCase().includes(r)) || '') : '';
-  if (org || point) {
-    for (const email of asStringList(node.email)) acc.emails.push({ email: String(email), role });
-    for (const phone of asStringList(node.telephone)) acc.phones.push(String(phone));
-  }
-  for (const value of Object.values(node)) {
-    if (value && typeof value === 'object') walkLd(value, acc, seen);
-  }
-}
 
 function metaContent(html, prop) {
   for (const tag of html.matchAll(/<meta\b[^>]*>/gi)) {
@@ -67,8 +38,7 @@ export function extractLeads(html = '', url = '') {
   const source = String(html);
   const contacts = [];
   const seen = new Set();
-  const ld = { companyName: '', emails: [], phones: [] };
-  readJsonLd(source, ld);
+  const ld = readLeadJsonLd(source, emptyLeadLdAcc());
   const companyName = ld.companyName || metaContent(source, 'og:site_name');
 
   let mailto = 0;
