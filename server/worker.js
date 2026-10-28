@@ -8,11 +8,10 @@ import { deliverMail, emailErrorLine } from './queue/finishRun.js';
 import {
   emailRetryDelayMs,
   heartbeatIntervalMs,
-  isDeadEmailAttempt,
-  nextEmailAttempt,
   workerIdleMs,
   workerLeaseMs,
 } from './queue/workerPolicy.js';
+import { decideEmailOutcome } from './queue/emailJobDecide.js';
 import { getRun, save } from './storage/runStore.js';
 import { closeBrowser, getBrowser } from './engine/capturePage.js';
 import { pruneBaselines } from './quota/prune.js';
@@ -24,7 +23,7 @@ let stopping = false;
 
 async function emailJob(job) {
   const run = await getRun(job.run_id);
-  if (!run) {
+  if (decideEmailOutcome({ runExists: Boolean(run) }) === 'complete-missing') {
     await complete(job.id);
     return;
   }
@@ -32,8 +31,8 @@ async function emailJob(job) {
     await deliverMail(run);
     await complete(job.id);
   } catch (e) {
-    const next = nextEmailAttempt(job.attempts);
-    if (isDeadEmailAttempt(next)) {
+    const outcome = decideEmailOutcome({ runExists: true, deliveredOk: false, attempts: job.attempts });
+    if (outcome === 'complete-dead') {
       run.emailError = emailErrorLine(e);
       await save(run);
       await complete(job.id);
