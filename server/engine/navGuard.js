@@ -1,13 +1,11 @@
 import net from 'node:net';
-import { assertPublicUrl, isPrivateIp } from '../routes/validate.js';
+import { assertPublicUrl, isMetadataHost, isPrivateIp } from '../routes/validate.js';
 
 /** Literal private IPs and cloud-metadata style hosts (no DNS lookup). */
 export function isBlockedHost(host) {
   const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
   if (!h) return false;
-  if (h === 'metadata.google.internal' || h.endsWith('.internal') || h === 'kubernetes.default') {
-    return true;
-  }
+  if (isMetadataHost(h)) return true;
   return net.isIP(h) > 0 && isPrivateIp(h);
 }
 
