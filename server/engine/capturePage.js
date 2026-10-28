@@ -6,8 +6,9 @@ import { VIEWPORTS, contextOptions } from './viewports.js';
 import { evaluate } from '../heuristics/evaluate.js';
 import { assertPublicUrl } from '../routes/validate.js';
 import { installNavGuard } from './navGuard.js';
-
-const FREEZE_CSS = `*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important;scroll-behavior:auto!important}`;
+import {
+  FREEZE_CSS, LEAD_HTML_CAP, captureBudgets, screenshotOptions,
+} from './captureBudgets.js';
 
 let browserPromise;
 export async function getBrowser() {
@@ -63,8 +64,7 @@ export async function capturePage(url, vp, outFile, {
 } = {}) {
   const browser = await getBrowser();
   const context = await browser.newContext(contextOptions(vp));
-  const scrollBudget = fast ? 1200 : 2500;
-  const fontCap = fast ? 800 : 1500;
+  const { scrollBudgetMs, fontCapMs, settleMs } = captureBudgets(fast);
   try {
     if (deterministic) {
       await context.addInitScript(() => {
@@ -96,31 +96,28 @@ export async function capturePage(url, vp, outFile, {
     const idleMs = 0;
     await page.addStyleTag({ content: FREEZE_CSS });
     t = mark();
-    await autoScroll(page, scrollBudget);
+    await autoScroll(page, scrollBudgetMs);
     const scrollMs = mark() - t;
     t = mark();
     const fontWait = await page.evaluate((cap) => Promise.race([
       (document.fonts?.ready || Promise.resolve()).then(() => 'ready'),
       new Promise((resolve) => setTimeout(() => resolve('cap'), cap)),
-    ]), fontCap);
+    ]), fontCapMs);
     const fontMs = mark() - t;
     const partial = fontWait === 'cap';
-    if (!fast) await page.waitForTimeout(50);
+    if (settleMs) await page.waitForTimeout(settleMs);
 
     const result = await page.evaluate(evaluate, { touch: vp.touch, viewportWidth: vp.width });
     const leadHtml = collectLeads
-      ? await page.evaluate(() => (document.documentElement?.outerHTML || '').slice(0, 1500000))
+      ? await page.evaluate((cap) => (document.documentElement?.outerHTML || '').slice(0, cap), LEAD_HTML_CAP)
       : '';
 
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     fs.mkdirSync(path.dirname(outFile), { recursive: true });
     t = mark();
-    await page.screenshot({
-      path: outFile,
-      fullPage: true,
-      animations: 'disabled',
-      ...(height > config.maxShotHeight ? { clip: { x: 0, y: 0, width: vp.width, height: config.maxShotHeight } } : {}),
-    });
+    await page.screenshot(screenshotOptions(outFile, {
+      height, width: vp.width, maxShotHeight: config.maxShotHeight,
+    }));
     const timings = { gotoMs, idleMs, scrollMs, fontMs, shotMs: mark() - t };
     const payload = { ...result, timings, partial };
     return leadHtml ? { ...payload, leadHtml } : payload;
