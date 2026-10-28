@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import path from 'node:path';
 import fs from 'node:fs';
 import { config } from './config.js';
@@ -14,40 +13,10 @@ import { accountHandler, checkoutHandler, webhookHandler } from './billing/strip
 import { timingSafeEqual } from './util/timingSafeEqual.js';
 import { getLocalIp } from './util/localIp.js';
 import { originAllowed } from './util/originAllowed.js';
+import { createApiLimiters } from './http/rateLimits.js';
+import { healthPayload } from './http/healthPayload.js';
 
-const ipOf = (req) => ipKeyGenerator(req.ip || '127.0.0.1');
-const postsOnly = (req) => req.method !== 'POST';
-
-function limit({ windowMs, max, keyGenerator, skip }) {
-  return rateLimit({
-    windowMs,
-    limit: max,
-    standardHeaders: true,
-    legacyHeaders: false,
-    keyGenerator,
-    ...(skip ? { skip } : {}),
-  });
-}
-
-const postByIp = limit({ windowMs: 15 * 60 * 1000, max: 10, keyGenerator: ipOf, skip: postsOnly });
-const postByKey = limit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  keyGenerator: (req) => req.auth?.keyId || ipOf(req),
-  skip: postsOnly,
-});
-const shareByIp = limit({ windowMs: 60 * 1000, max: 60, keyGenerator: ipOf });
-const billingByKey = limit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  keyGenerator: (req) => req.auth?.keyId || ipOf(req),
-});
-const readByIp = limit({
-  windowMs: 60 * 1000,
-  max: 120,
-  keyGenerator: ipOf,
-  skip: (req) => req.method !== 'GET',
-});
+const { postByIp, postByKey, shareByIp, billingByKey, readByIp } = createApiLimiters();
 
 export function createApp() {
   const app = express();
@@ -61,17 +30,11 @@ export function createApp() {
   });
 
   const health = async (_req, res) => {
-    const mem = process.memoryUsage();
-    res.json({
-      ok: true,
-      name: 'qaZAR',
-      version: '0.1.0',
-      uptimeSec: Math.round(process.uptime()),
-      memoryMb: Math.round(mem.rss / 1024 / 1024),
+    res.json(healthPayload({
       activeRuns: await countActiveRuns(),
       db: dbDriver,
       storage: config.storageDriver,
-    });
+    }));
   };
   app.get('/healthz', health);
   app.get('/api/health', health);
