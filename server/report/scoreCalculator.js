@@ -3,6 +3,11 @@
  * for client-facing audit reports and lead generation.
  */
 
+import { captureCoverage } from './captureCoverage.js';
+import {
+  categoryBucket, compareClusters, defectClusterKey, emptyCategories, normalizeSelector,
+} from './defectCluster.js';
+
 /**
  * Clusters recurring violations across pages and viewports to eliminate
  * reporting noise, false duplication, and inflated defect counts.
@@ -14,13 +19,10 @@ export function clusterDefects(run) {
   for (const page of run.pages || []) {
     for (const [vp, rec] of Object.entries(page.viewports || {})) {
       for (const v of rec.violations || []) {
-        const normalizedSel = (v.selector || '')
-          .replace(/:nth-of-type\(\d+\)/g, '')
-          .replace(/\s+/g, ' ')
-          .trim();
-        const key = `${v.rule}::${v.severity}::${normalizedSel || v.detail || 'unknown'}`;
+        const key = defectClusterKey(v);
         let item = map.get(key);
         if (!item) {
+          const normalizedSel = normalizeSelector(v.selector);
           item = {
             rule: v.rule,
             severity: v.severity,
@@ -51,45 +53,8 @@ export function clusterDefects(run) {
     observed: `observed on ${c.pages.size} of ${totalPages} page(s)`,
   }));
 
-  clusters.sort((a, b) => {
-    if (a.severity === 'error' && b.severity !== 'error') return -1;
-    if (a.severity !== 'error' && b.severity === 'error') return 1;
-    return b.totalOccurrences - a.totalOccurrences;
-  });
-
+  clusters.sort(compareClusters);
   return clusters;
-}
-
-function coverageOf(run) {
-  let attempted = 0;
-  let completed = 0;
-  let failed = 0;
-  let partial = 0;
-  const capped = new Set();
-  let contrastCapped = false;
-  let collisionCapped = false;
-  for (const page of run.pages || []) {
-    for (const rec of Object.values(page.viewports || {})) {
-      if (!rec || rec.status === 'pending') continue;
-      attempted += 1;
-      if (rec.status === 'error') failed += 1;
-      else completed += 1;
-      if (rec.partial) partial += 1;
-      for (const rule of rec.metrics?.capped || []) capped.add(rule);
-      if (rec.metrics?.contrastSampleCapped) contrastCapped = true;
-      if (rec.metrics?.collisionSampleCapped) collisionCapped = true;
-    }
-  }
-  const notes = [];
-  if (capped.size || contrastCapped || collisionCapped) notes.push('Some counts are capped and are not exhaustive.');
-  if (partial) notes.push(`${partial} capture(s) hit the font wait and are partial.`);
-  if (run.input?.deterministic === true) notes.push('Deterministic mode injected a frozen clock and a seeded Math.random.');
-  return {
-    attempted,
-    completed,
-    failed,
-    line: `${completed} of ${attempted} captures completed${failed ? `, ${failed} failed` : ''}. ${notes.join(' ')}`.trim(),
-  };
 }
 
 export function calculateHealthScore(run) {
@@ -99,14 +64,12 @@ export function calculateHealthScore(run) {
   const warnClusters = confirmed.filter((c) => c.severity === 'warn');
   const rawErrors = errorClusters.reduce((acc, c) => acc + c.totalOccurrences, 0);
   const rawWarnings = warnClusters.reduce((acc, c) => acc + c.totalOccurrences, 0);
-  const categories = { mobileTouch: 0, overflowBreakage: 0, wcagContrast: 0, typography: 0, collisions: 0 };
+  const categories = emptyCategories();
   for (const c of confirmed) {
-    if (c.rule === 'target-size-minimum') categories.mobileTouch += c.totalOccurrences;
-    else if (c.rule.includes('overflow')) categories.overflowBreakage += c.totalOccurrences;
-    else if (c.rule === 'wcag-contrast') categories.wcagContrast += c.totalOccurrences;
-    else if (c.rule === 'element-collision') categories.collisions += c.totalOccurrences;
+    const bucket = categoryBucket(c.rule);
+    if (bucket) categories[bucket] += c.totalOccurrences;
   }
-  const coverage = coverageOf(run);
+  const coverage = captureCoverage(run);
   return {
     metrics: {
       totalPages: run.pages?.length || 0,
