@@ -3,7 +3,8 @@
  * Mailto, tel, JSON-LD Organization/ContactPoint, and booking links only.
  */
 
-const JUNK_EMAIL = /noreply|no-reply|sentry|wixpress|wix\.com|example\.|schema\.org|w3\.org|cloudflare|godaddy|u003e|\.(?:png|jpe?g|gif|svg|css|js)$/i;
+import { isJunkEmail, phoneDigits, scoreLeadHeat } from './leadSignals.js';
+
 const ROLES = ['founder', 'sales', 'support', 'press'];
 const SOCIAL_HOSTS = ['linkedin.com', 'twitter.com', 'x.com', 'github.com', 'instagram.com'];
 const BOOKING = /https?:\/\/(?:[\w.-]+\.)?(?:calendly\.com|cal\.com|savvycal\.com|meetings\.hubspot\.com|hubspot\.com\/meetings)\/[^\s"'<>]+/gi;
@@ -13,18 +14,14 @@ function decode(s) {
 }
 
 export function normalizePhone(raw) {
-  const trimmed = String(raw || '').trim().replace(/^tel:/i, '').trim();
-  const digits = trimmed.replace(/\D/g, '');
-  if (digits.length < 7 || digits.length > 15) return '';
-  if (/^0+$/.test(digits) || /^(\d)\1{6,}$/.test(digits)) return '';
-  return trimmed.startsWith('+') ? `+${digits}` : digits;
+  return phoneDigits(raw);
 }
 
 function junkEmail(email) {
-  const e = String(email || '').toLowerCase().trim();
-  if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(e)) return true;
-  return JUNK_EMAIL.test(e);
+  return isJunkEmail(email);
 }
+
+export { scoreLeadHeat };
 
 function roleNear(html, index) {
   const slice = html.slice(Math.max(0, index - 180), index + 80).replace(/<[^>]+>/g, ' ').toLowerCase();
@@ -161,17 +158,6 @@ export function extractLeads(html = '', url = '') {
     phones: of('phone').slice(0, 3),
     socials: of('social').slice(0, 4),
   };
-}
-
-export function scoreLeadHeat({ emails = [], phones = [], bookingLinks = [], hasLeadForm = false, hasContact = false, hasPricing = false } = {}) {
-  let heat = 0;
-  if (emails.length) heat += 30;
-  if (phones.length) heat += 20;
-  if (hasLeadForm) heat += 15;
-  if (bookingLinks.length) heat += 15;
-  if (hasContact) heat += 10;
-  if (hasPricing) heat += 10;
-  return Math.min(100, heat);
 }
 
 function addUnique(list, value) {
