@@ -30,3 +30,6 @@ export function canCancelRunStatus(status) {
 }
 
 export const LEASE_EXPIRED_ERROR = 'lease expired';
+
+/** Written onto stuck runs when a worker reclaims work after a process death. */
+export const SERVER_RESTARTED_NOTE = 'Server restarted — job requeued';

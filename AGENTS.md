@@ -49,7 +49,7 @@ Viewport UI/UX QA + visual regression suite. Node/Express API + Playwright worke
 ## Known weak spots
 - Complex CSS pseudo-elements (::before/::after) background compositing can require indeterminate contrast flagging.
 - Collision check samples top 60 elements with viewport-intersection filtering.
-- Expired job leases are reclaimed; set `QAZAR_SINGLE_WORKER=1` only for a lone worker that should steal live leases on boot.
+- Durable SQLite/Postgres job leases; `MAX_CONCURRENT_RUNS` (default 2) caps parallel Chromium work per worker. Set `QAZAR_SINGLE_WORKER=1` on a lone host so boot steals live leases and requeues stuck crawls (`Server restarted — job requeued`).
 - `evaluateCrossViewport` compares `desktop` vs `tablet` and `mobile` across H1/H2 and detects breakpoint style inversions.
 
 ## Agent tooling map

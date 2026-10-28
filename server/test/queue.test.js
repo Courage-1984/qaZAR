@@ -45,7 +45,8 @@ test('an expired lease is queued again until the third reclaim', () => {
 test('single-worker boot may reclaim a live lease without adding an attempt', () => {
   const database = getDb();
   database.prepare(`INSERT INTO jobs (id, run_id, kind, status, available_at, lease_until, attempts) VALUES ('job-boot', 'run-d', 'audit', 'leased', 0, 9999999999999, 2)`).run();
-  reclaimLeased(50);
+  const stolen = reclaimLeased(50);
+  assert.ok(stolen >= 1);
   const row = database.prepare(`SELECT status, attempts, lease_until FROM jobs WHERE id = 'job-boot'`).get();
   assert.equal(row.status, 'queued');
   assert.equal(row.attempts, 2);

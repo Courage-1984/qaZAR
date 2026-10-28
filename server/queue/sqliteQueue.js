@@ -69,13 +69,17 @@ export function fail(jobId, err, now = Date.now()) {
   return false;
 }
 
-/** A new worker process is the only worker, so take back rows left leased by the last one. */
+/**
+ * Lone-worker cold start: steal live leases left by a dead process.
+ * @returns {number} rows returned to queued
+ */
 export function reclaimLeased(now = Date.now()) {
-  getDb().prepare(`
+  const info = getDb().prepare(`
     UPDATE jobs
     SET status = 'queued', lease_until = NULL, worker_id = NULL, available_at = ?
     WHERE status = 'leased'
   `).run(now);
+  return Number(info.changes || 0);
 }
 
 export function countJobs() {

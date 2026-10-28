@@ -5,6 +5,7 @@ import {
   emailRetryDelayMs,
   heartbeatIntervalMs,
   isDeadEmailAttempt,
+  maxConcurrentRuns,
   nextEmailAttempt,
   workerIdleMs,
   workerLeaseMs,
@@ -24,6 +25,13 @@ test('worker lease idle and email backoff pin defaults', () => {
   assert.equal(isDeadEmailAttempt(2), false);
   assert.equal(emailRetryDelayMs(0), 60_000);
   assert.equal(emailRetryDelayMs(9), 900_000);
+});
+
+test('maxConcurrentRuns defaults to 2 and caps at 16', () => {
+  assert.equal(maxConcurrentRuns({}), 2);
+  assert.equal(maxConcurrentRuns({ MAX_CONCURRENT_RUNS: '4' }), 4);
+  assert.equal(maxConcurrentRuns({ MAX_CONCURRENT_RUNS: '0' }), 2);
+  assert.equal(maxConcurrentRuns({ MAX_CONCURRENT_RUNS: '99' }), 16);
 });
 
 test('newRunRecord and list/SSE helpers', () => {
