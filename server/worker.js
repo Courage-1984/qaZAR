@@ -4,14 +4,22 @@ import {
 } from './queue/jobs.js';
 import { awaitDb, dbPath } from './storage/db.js';
 import { processRun } from './queue/jobQueue.js';
-import { deliverMail, BACKOFF, emailErrorLine } from './queue/finishRun.js';
+import { deliverMail, emailErrorLine } from './queue/finishRun.js';
+import {
+  emailRetryDelayMs,
+  heartbeatIntervalMs,
+  isDeadEmailAttempt,
+  nextEmailAttempt,
+  workerIdleMs,
+  workerLeaseMs,
+} from './queue/workerPolicy.js';
 import { getRun, save } from './storage/runStore.js';
 import { closeBrowser, getBrowser } from './engine/capturePage.js';
 import { pruneBaselines } from './quota/prune.js';
 
 const workerId = process.env.WORKER_ID || crypto.randomUUID();
-const LEASE = Number(process.env.WORKER_LEASE_MS || 60_000);
-const IDLE_MS = Number(process.env.WORKER_IDLE_MS || 400);
+const LEASE = workerLeaseMs();
+const IDLE_MS = workerIdleMs();
 let stopping = false;
 
 async function emailJob(job) {
@@ -24,14 +32,14 @@ async function emailJob(job) {
     await deliverMail(run);
     await complete(job.id);
   } catch (e) {
-    const next = (job.attempts || 0) + 1;
-    if (next >= 3) {
+    const next = nextEmailAttempt(job.attempts);
+    if (isDeadEmailAttempt(next)) {
       run.emailError = emailErrorLine(e);
       await save(run);
       await complete(job.id);
       return;
     }
-    await retryLater(job.id, BACKOFF[job.attempts] || BACKOFF[2], e);
+    await retryLater(job.id, emailRetryDelayMs(job.attempts), e);
   }
 }
 
@@ -42,7 +50,7 @@ async function tick() {
   console.log(`qaZAR worker ${workerId.slice(0, 8)} claimed ${job.kind} ${job.run_id}`);
   const beat = setInterval(() => {
     heartbeat(job.id, LEASE).catch(() => {});
-  }, Math.max(5_000, Math.floor(LEASE / 4)));
+  }, heartbeatIntervalMs(LEASE));
   try {
     if (job.kind === 'email') await emailJob(job);
     else {

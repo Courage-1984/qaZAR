@@ -5,10 +5,10 @@ import { storage } from '../storage/storageAdapter.js';
 import { save } from '../storage/runStore.js';
 import { enqueue } from './jobs.js';
 import { firstLine as emailErrorLine } from '../util/firstLine.js';
-
-const BACKOFF = [60_000, 5 * 60_000, 15 * 60_000];
+import { EMAIL_BACKOFF_MS } from './workerPolicy.js';
 
 export { emailErrorLine };
+export const BACKOFF = EMAIL_BACKOFF_MS;
 
 async function clearEmailError(run) {
   if (!run.emailError) return;
@@ -41,5 +41,3 @@ export async function deliverMail(run) {
   await sendReport({ run });
   await clearEmailError(run);
 }
-
-export { BACKOFF };
