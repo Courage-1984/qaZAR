@@ -6,6 +6,7 @@ import {
   discoveryGistId,
   parseTryCloudflareUrl,
 } from './tunnelParse.js';
+import { TUNNEL_READY_MS, cloudflaredTunnelArgs } from './tunnelArgs.js';
 
 export function findCloudflaredBin() {
   for (const p of cloudflaredCandidates()) {
@@ -31,7 +32,7 @@ export async function startPublicTunnel(port = 8787) {
     if (!cfBin) return resolve(null);
 
     try {
-      const proc = spawn(cfBin, ['tunnel', '--url', `http://localhost:${port}`], {
+      const proc = spawn(cfBin, cloudflaredTunnelArgs(port), {
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
       });
@@ -58,7 +59,7 @@ export async function startPublicTunnel(port = 8787) {
           settled = true;
           resolve(null);
         }
-      }, 15000);
+      }, TUNNEL_READY_MS);
     } catch {
       resolve(null);
     }

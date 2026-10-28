@@ -15,6 +15,7 @@ import { getLocalIp } from './util/localIp.js';
 import { originAllowed } from './util/originAllowed.js';
 import { createApiLimiters } from './http/rateLimits.js';
 import { healthPayload } from './http/healthPayload.js';
+import { discoveryResponse } from './tunnelArgs.js';
 
 const { postByIp, postByKey, shareByIp, billingByKey, readByIp } = createApiLimiters();
 
@@ -38,10 +39,10 @@ export function createApp() {
   };
   app.get('/healthz', health);
   app.get('/api/health', health);
-  app.get('/api/discovery', (_req, res) => res.json({
+  app.get('/api/discovery', (_req, res) => res.json(discoveryResponse({
     localIp: getLocalIp(),
     port: config.port,
-  }));
+  })));
   app.post('/api/operator/session', (req, res) => {
     const supplied = String(req.body?.key || '');
     const expected = process.env.QAZAR_OPERATOR_KEY || '';

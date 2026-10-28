@@ -1,6 +1,7 @@
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import { config } from '../config.js';
+import { isPrivateV4 } from './privateV4.js';
 
 /** Last 32 bits of a dotted or hex IPv4 embedded in ::ffff: or 64:ff9b:: (any expansion). */
 export function embeddedIpv4(host) {
@@ -14,16 +15,6 @@ export function embeddedIpv4(host) {
   const lo = Number.parseInt(hex[2], 16);
   if (!Number.isFinite(hi) || !Number.isFinite(lo)) return null;
   return `${(hi >> 8) & 255}.${hi & 255}.${(lo >> 8) & 255}.${lo & 255}`;
-}
-
-function isPrivateV4(a, b) {
-  return a === 10
-    || a === 127
-    || a === 0
-    || (a === 169 && b === 254)
-    || (a === 172 && b >= 16 && b <= 31)
-    || (a === 192 && b === 168)
-    || (a === 100 && b >= 64 && b <= 127);
 }
 
 export function isPrivateIp(ip) {

@@ -9,19 +9,20 @@ import { evaluateCrossViewport, processViewport } from './viewportWork.js';
 import {
   captureConcurrency, crawlConcurrency, emptyProgress, seedPages, summarizeRun,
 } from './runSummary.js';
+import {
+  advanceStage, doneRunFields, failRunFields, isRunCancelled, stageLogLine,
+} from './jobStage.js';
 
 export { evaluateCrossViewport };
 
 async function stopped(runId) {
-  const current = await getRun(runId);
-  return !current || current.status === 'cancelled';
+  return isRunCancelled(await getRun(runId));
 }
 
 function note(runId, stage, seen) {
-  if (!stage || stage === seen.current) return seen.current;
-  seen.current = stage;
-  console.log(`qaZAR worker ${runId} ${stage}`);
-  return stage;
+  if (!advanceStage(seen, stage)) return seen.current;
+  console.log(stageLogLine(runId, stage));
+  return seen.current;
 }
 
 function runWriter(runId, run) {
@@ -32,7 +33,7 @@ function runWriter(runId, run) {
 
 export async function processRun(runId) {
   const run = await getRun(runId);
-  if (!run || run.status === 'cancelled') return;
+  if (isRunCancelled(run)) return;
   const seen = { current: '' };
   try {
     run.status = 'crawling';
@@ -82,19 +83,14 @@ export async function processRun(runId) {
     await persist.drain();
 
     if (await stopped(runId)) return;
-    run.captureMs = Date.now() - captureStarted;
-    run.summary = summarizeRun(run);
-    run.status = 'done';
-    run.finishedAt = new Date().toISOString();
+    Object.assign(run, doneRunFields(summarizeRun(run), Date.now() - captureStarted));
     await save(run);
     note(runId, 'done', seen);
     await finishRun(run);
   } catch (e) {
     if (await stopped(runId)) return;
     note(runId, 'failed', seen);
-    run.status = 'failed';
-    run.error = String(e.message || e);
-    run.finishedAt = new Date().toISOString();
+    Object.assign(run, failRunFields(e));
     await save(run);
     throw e;
   }
