@@ -5,6 +5,7 @@ import { promoteRun } from '../visual/baseline.js';
 import { validateRunInput } from './validate.js';
 import { generateExecutiveReport } from '../report/reportGenerator.js';
 import { reviewFindings } from '../report/findingReview.js';
+import { reportDownloadName } from '../report/reportMeta.js';
 import { assertInflight } from '../quota/enforce.js';
 import { storage } from '../storage/storageAdapter.js';
 import fs from 'node:fs';
@@ -48,8 +49,7 @@ runsRouter.get('/:id/report', async (req, res) => {
   const agency = req.query.agency || req.query.brand || null;
   const html = generateExecutiveReport(run, leadEmail, { agency });
   if (req.query.download === '1') {
-    const safeDomain = run.input?.domain?.replace(/https?:\/\//, '').replace(/[^a-zA-Z0-9.-]/g, '_') || run.id;
-    res.setHeader('Content-Disposition', `attachment; filename="qaZAR-audit-${safeDomain}.html"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${reportDownloadName(run)}"`);
   }
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);

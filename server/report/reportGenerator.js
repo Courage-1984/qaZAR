@@ -3,6 +3,9 @@ import { getReportStyles } from './reportStyles.js';
 import { renderSeoSection } from './seoSection.js';
 import { renderLeadSection } from './leadSection.js';
 import { esc } from './esc.js';
+import {
+  flattenRoadmap, reportDate, reportDomain, reportTimingLine,
+} from './reportMeta.js';
 
 function list(items) {
   return items.map((item) => `<li>${esc(item)}</li>`).join('');
@@ -28,16 +31,12 @@ function findings(clusters) {
 export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev', options = {}) {
   const health = calculateHealthScore(run);
   const { metrics, clusters, facts, roadmap } = health;
-  const domain = run.input?.domain || 'Unknown domain';
+  const domain = reportDomain(run);
   const agency = options.agency || 'qaZAR';
-  const dateStr = new Date(run.createdAt || Date.now()).toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric',
-  });
+  const dateStr = reportDate(run.createdAt);
   const shown = clusters || [];
-  const timing = [
-    run.crawlMs != null ? `Discovery ${run.crawlMs} ms` : '',
-    run.captureMs != null ? `Capture ${run.captureMs} ms` : '',
-  ].filter(Boolean).join('. ');
+  const timing = reportTimingLine(run);
+  const next = flattenRoadmap(roadmap);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -77,10 +76,10 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev',
       <h2>Findings (${shown.length})</h2>
       ${findings(shown)}
     </section>` : ''}
-    ${(roadmap && (roadmap.quickWins.length || roadmap.coreUx.length || roadmap.strategic.length)) ? `
+    ${next.length ? `
     <section class="impact-section">
       <h2>What to check next</h2>
-      <ul>${list([...roadmap.quickWins, ...roadmap.coreUx, ...roadmap.strategic])}</ul>
+      <ul>${list(next)}</ul>
     </section>` : ''}
     ${renderSeoSection(run.siteProfile)}
     <section class="cta-card">

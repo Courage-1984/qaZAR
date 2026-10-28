@@ -3,6 +3,9 @@ import { getPdfStyles } from './pdfStyles.js';
 import { renderSeoSection } from './seoSection.js';
 import { renderLeadSection } from './leadSection.js';
 import { esc } from './esc.js';
+import {
+  flattenRoadmap, reportDate, reportDomain, reportTimingLine, viewportViolationTallies,
+} from './reportMeta.js';
 
 function findings(clusters) {
   return clusters.map((c) => {
@@ -17,20 +20,9 @@ function findings(clusters) {
 }
 
 function viewportTable(pages) {
-  const names = ['ultrawide', 'fhd', 'macbook', 'desktop', 'laptop', 'tablet', 'mobile'];
-  const rows = names.map((name) => {
-    let errors = 0;
-    let warns = 0;
-    for (const page of pages || []) {
-      const rec = page.viewports?.[name];
-      if (!rec || rec.status === 'pending' || rec.status === 'error') continue;
-      for (const item of rec.violations || []) {
-        if (item.severity === 'error') errors += 1;
-        else if (item.severity === 'warn') warns += 1;
-      }
-    }
-    return `<tr><td>${name}</td><td>${errors}</td><td>${warns}</td></tr>`;
-  }).join('');
+  const rows = viewportViolationTallies(pages).map(({ name, errors, warns }) => (
+    `<tr><td>${name}</td><td>${errors}</td><td>${warns}</td></tr>`
+  )).join('');
   return `<section><h2>By viewport</h2>
     <table class="seo-table"><thead><tr><th>Viewport</th><th>Errors</th><th>Warnings</th></tr></thead><tbody>${rows}</tbody></table>
   </section>`;
@@ -39,17 +31,12 @@ function viewportTable(pages) {
 /** A4 document. Same findings and coverage line as the on-screen report. */
 export function generatePdfReport(run, leadEmail = 'consulting@qazar.dev', options = {}) {
   const { metrics, clusters, facts, roadmap } = calculateHealthScore(run);
-  const domain = run.input?.domain || 'Unknown domain';
+  const domain = reportDomain(run);
   const agency = options.agency || 'qaZAR';
-  const dateStr = new Date(run.createdAt || Date.now()).toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric',
-  });
+  const dateStr = reportDate(run.createdAt);
   const shown = clusters || [];
-  const timing = [
-    run.crawlMs != null ? `Discovery ${run.crawlMs} ms` : '',
-    run.captureMs != null ? `Capture ${run.captureMs} ms` : '',
-  ].filter(Boolean).join('. ');
-  const next = [...(roadmap?.quickWins || []), ...(roadmap?.coreUx || []), ...(roadmap?.strategic || [])];
+  const timing = reportTimingLine(run);
+  const next = flattenRoadmap(roadmap);
   return `<!doctype html>
 <html lang="en">
 <head>
