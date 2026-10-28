@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import { setTier, setTierByCustomer } from '../storage/db.js';
 import { limitsFor } from '../quota/enforce.js';
+import { requireKeyAuth } from '../auth/requireKey.js';
 import {
   buildAccountPayload,
   buildCheckoutSessionParams,
@@ -44,7 +45,7 @@ export async function webhookHandler(req, res) {
 }
 
 export async function checkoutHandler(req, res) {
-  if (req.auth?.via !== 'key') return res.status(401).json({ error: 'Unauthorized' });
+  if (!requireKeyAuth(req, res)) return;
   try {
     res.json({ url: await createCheckout(req.auth.ownerId) });
   } catch (e) {
@@ -54,7 +55,7 @@ export async function checkoutHandler(req, res) {
 
 /** Current tier + quotas for a bearer key (Logi-Ink account screen). */
 export async function accountHandler(req, res) {
-  if (req.auth?.via !== 'key') return res.status(401).json({ error: 'Unauthorized' });
+  if (!requireKeyAuth(req, res)) return;
   const limits = await limitsFor(req.auth);
   res.json(buildAccountPayload(req.auth, limits));
 }
