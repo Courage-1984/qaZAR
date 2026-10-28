@@ -5,14 +5,16 @@ import { promoteRun } from '../visual/baseline.js';
 import { validateRunInput } from './validate.js';
 import { generateExecutiveReport } from '../report/reportGenerator.js';
 import { reviewFindings } from '../report/findingReview.js';
+import { reportDownloadName } from '../report/reportMeta.js';
 import { assertInflight } from '../quota/enforce.js';
 import { storage } from '../storage/storageAdapter.js';
+import { createOwnerId, ownerScopeFromAuth } from '../http/authScope.js';
 import fs from 'node:fs';
 
 export const runsRouter = Router();
 
 function scope(req) {
-  return req.auth?.via === 'key' ? req.auth.ownerId : null;
+  return ownerScopeFromAuth(req.auth);
 }
 
 async function owned(req, id) {
@@ -26,7 +28,7 @@ runsRouter.post('/', async (req, res) => {
       publicCaller: Boolean(req.auth?.publicCaller),
       pageCap: limits.pageCap,
     });
-    const run = await createRun(input, { ownerId: req.auth?.ownerId || 'operator' });
+    const run = await createRun(input, { ownerId: createOwnerId(req.auth) });
     await enqueue(run.id, 'audit');
     res.status(202).json({ runId: run.id, shareToken: run.shareToken });
   } catch (e) {
@@ -48,8 +50,7 @@ runsRouter.get('/:id/report', async (req, res) => {
   const agency = req.query.agency || req.query.brand || null;
   const html = generateExecutiveReport(run, leadEmail, { agency });
   if (req.query.download === '1') {
-    const safeDomain = run.input?.domain?.replace(/https?:\/\//, '').replace(/[^a-zA-Z0-9.-]/g, '_') || run.id;
-    res.setHeader('Content-Disposition', `attachment; filename="qaZAR-audit-${safeDomain}.html"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${reportDownloadName(run)}"`);
   }
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
@@ -89,6 +90,10 @@ runsRouter.get('/:id/events', async (req, res) => {
   await push();
   subscribe(run.id, res);
   const keepAlive = setInterval(() => {
+    if (res.writableEnded) {
+      clearInterval(keepAlive);
+      return;
+    }
     push().catch(() => clearInterval(keepAlive));
   }, 2000);
   res.on('close', () => clearInterval(keepAlive));

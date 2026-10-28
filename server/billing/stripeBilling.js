@@ -1,6 +1,12 @@
 import Stripe from 'stripe';
 import { setTier, setTierByCustomer } from '../storage/db.js';
 import { limitsFor } from '../quota/enforce.js';
+import { requireKeyAuth } from '../auth/requireKey.js';
+import {
+  buildAccountPayload,
+  buildCheckoutSessionParams,
+  planTierUpdate,
+} from './stripeEvents.js';
 
 function client() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('Stripe is not configured');
@@ -8,38 +14,20 @@ function client() {
 }
 
 export async function createCheckout(ownerId) {
-  const session = await client().checkout.sessions.create({
-    mode: 'subscription',
-    line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
-    success_url: process.env.STRIPE_SUCCESS_URL || 'https://logi-ink.co.za/contact?paid=1',
-    cancel_url: process.env.STRIPE_CANCEL_URL || 'https://logi-ink.co.za/contact',
-    client_reference_id: ownerId,
-    metadata: { ownerId },
-  });
+  const session = await client().checkout.sessions.create(
+    buildCheckoutSessionParams(ownerId),
+  );
   return session.url;
 }
 
 export async function applyEvent(event) {
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
-    const ownerId = session.client_reference_id || session.metadata?.ownerId;
-    if (ownerId) await setTier(ownerId, 'pro', session.customer || null);
+  const plan = planTierUpdate(event);
+  if (!plan) return;
+  if (plan.op === 'setTier') {
+    await setTier(plan.ownerId, plan.tier, plan.customer);
+    return;
   }
-  if (event.type === 'customer.subscription.deleted') {
-    const customer = event.data.object.customer;
-    if (customer) await setTierByCustomer(customer, 'free');
-  }
-  if (event.type === 'customer.subscription.updated') {
-    const sub = event.data.object;
-    const customer = sub.customer;
-    if (!customer) return;
-    const paid = ['active', 'trialing'].includes(sub.status);
-    await setTierByCustomer(customer, paid ? 'pro' : 'free');
-  }
-  if (event.type === 'invoice.payment_failed') {
-    const customer = event.data.object.customer;
-    if (customer) await setTierByCustomer(customer, 'free');
-  }
+  await setTierByCustomer(plan.customer, plan.tier);
 }
 
 export async function webhookHandler(req, res) {
@@ -57,7 +45,7 @@ export async function webhookHandler(req, res) {
 }
 
 export async function checkoutHandler(req, res) {
-  if (req.auth?.via !== 'key') return res.status(401).json({ error: 'Unauthorized' });
+  if (!requireKeyAuth(req, res)) return;
   try {
     res.json({ url: await createCheckout(req.auth.ownerId) });
   } catch (e) {
@@ -67,14 +55,7 @@ export async function checkoutHandler(req, res) {
 
 /** Current tier + quotas for a bearer key (Logi-Ink account screen). */
 export async function accountHandler(req, res) {
-  if (req.auth?.via !== 'key') return res.status(401).json({ error: 'Unauthorized' });
+  if (!requireKeyAuth(req, res)) return;
   const limits = await limitsFor(req.auth);
-  res.json({
-    ownerId: req.auth.ownerId,
-    tier: limits.tier || 'operator',
-    pageCap: limits.pageCap,
-    inflight: limits.inflight === Infinity ? null : limits.inflight,
-    baselineDays: limits.baselineDays,
-    checkout: Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID),
-  });
+  res.json(buildAccountPayload(req.auth, limits));
 }

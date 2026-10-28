@@ -3,6 +3,7 @@ import path from 'node:path';
 import { runsDir, baselinesDir } from '../config.js';
 import { S3Storage } from './s3Storage.js';
 import { ownerSeg, siteHash } from './paths.js';
+import { shouldBuildS3 } from './storageDriver.js';
 
 export { ownerSeg, siteHash };
 
@@ -73,9 +74,9 @@ class LocalFileStorageAdapter {
   }
 }
 
-export function createStorage() {
+export function createStorage(env = process.env) {
   const local = new LocalFileStorageAdapter();
-  if (process.env.STORAGE_DRIVER === 's3') return new S3Storage(local);
+  if (shouldBuildS3(env)) return new S3Storage(local);
   return local;
 }
 

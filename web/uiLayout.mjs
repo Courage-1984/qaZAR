@@ -116,7 +116,7 @@ try {
       await page.locator('#matrix').waitFor();
       await shoot(page, 'detail', vp);
       await page.setContent(reportHtml, { waitUntil: 'load' });
-      await page.locator('.grade-val').waitFor();
+      await page.locator('.grade-card').waitFor();
       await shoot(page, 'report', vp);
     } catch (err) {
       failures.push(err.message);

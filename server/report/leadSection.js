@@ -1,26 +1,15 @@
 import { esc } from './esc.js';
-
-function rows(profile) {
-  const rich = profile.leadContacts?.contacts || [];
-  if (rich.length) return rich;
-  const lc = profile.leadContacts || {};
-  return [
-    ...(lc.emails || []).map((value) => ({ value, kind: 'email', role: '', page: '' })),
-    ...(lc.phones || []).map((value) => ({ value, kind: 'phone', role: '', page: '' })),
-    ...(lc.socials || []).map((value) => ({ value, kind: 'social', role: '', page: '' })),
-  ];
-}
+import { contactKindLabel, isNotSalesContact, leadContactRows } from './leadHelpers.js';
 
 /** Lead block for the executive report. Empty when the crawl found nothing public. */
 export function renderLeadSection(profile) {
   if (!profile?.leadContacts) return '';
-  const contacts = rows(profile);
+  const contacts = leadContactRows(profile);
   const bookings = profile.bookingLinks || [];
   if (!contacts.length && !bookings.length && !profile.companyName) return '';
-  const notSales = (value) => /privacy|complaint|regulator|ico\.|gdpr|abuse@|legal@|dpo@/i.test(value);
   const cards = contacts.map((c) => {
-    const label = c.kind === 'phone' ? 'Phone' : c.kind === 'social' ? 'Social' : 'Email';
-    const note = notSales(c.value) ? ' · not a sales contact' : '';
+    const label = contactKindLabel(c.kind);
+    const note = isNotSalesContact(c.value) ? ' · not a sales contact' : '';
     const role = c.role ? ` · ${esc(c.role)}` : '';
     const page = c.page ? `<span class="muted sm">${esc(c.page)}</span>` : '';
     const body = c.kind === 'social'

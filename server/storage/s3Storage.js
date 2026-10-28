@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import { DeleteObjectsCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { ownerSeg, siteHash } from './paths.js';
+import {
+  baselineObjectKey, baselineSitePrefix, runArtifactKey, runPrefix,
+} from './s3Keys.js';
 
 let built = 0;
 export const s3ClientsBuilt = () => built;
@@ -41,7 +43,7 @@ export class S3Storage {
 
   writeArtifact(runId, rel, content) {
     const abs = this.local.writeArtifact(runId, rel, content);
-    this.put(`runs/${runId}/${rel}`, content).catch((e) => console.error('s3 put failed', e.message || e));
+    this.put(runArtifactKey(runId, rel), content).catch((e) => console.error('s3 put failed', e.message || e));
     return abs;
   }
 
@@ -49,7 +51,7 @@ export class S3Storage {
     const local = this.local.readArtifact(runId, rel);
     if (local) return local;
     try {
-      const out = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: `runs/${runId}/${rel}` }));
+      const out = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: runArtifactKey(runId, rel) }));
       return Buffer.from(await out.Body.transformToByteArray());
     } catch {
       return null;
@@ -63,24 +65,24 @@ export class S3Storage {
   async mirrorArtifact(runId, rel) {
     const abs = this.getArtifactPath(runId, rel);
     if (!fs.existsSync(abs)) return;
-    await this.put(`runs/${runId}/${rel}`, fs.readFileSync(abs));
+    await this.put(runArtifactKey(runId, rel), fs.readFileSync(abs));
   }
 
   saveBaseline(domain, slug, viewport, sourceFile, ownerId = 'operator') {
     const dest = this.local.saveBaseline(domain, slug, viewport, sourceFile, ownerId);
-    const key = `baselines/${ownerSeg(ownerId)}/${siteHash(domain)}/${slug}/${viewport}.png`;
-    this.put(key, fs.readFileSync(dest)).catch((e) => console.error('s3 baseline failed', e.message || e));
+    this.put(baselineObjectKey(ownerId, domain, slug, viewport), fs.readFileSync(dest))
+      .catch((e) => console.error('s3 baseline failed', e.message || e));
     return dest;
   }
 
   deleteRunArtifacts(runId) {
     this.local.deleteRunArtifacts(runId);
-    this.deletePrefix(`runs/${runId}/`).catch((e) => console.error('s3 delete failed', e.message || e));
+    this.deletePrefix(runPrefix(runId)).catch((e) => console.error('s3 delete failed', e.message || e));
   }
 
   deleteBaselineSite(ownerId, hash) {
     this.local.deleteBaselineSite(ownerId, hash);
-    this.deletePrefix(`baselines/${ownerSeg(ownerId)}/${hash}/`)
+    this.deletePrefix(baselineSitePrefix(ownerId, hash))
       .catch((e) => console.error('s3 baseline delete failed', e.message || e));
   }
 

@@ -13,7 +13,7 @@ Viewport UI/UX QA + visual regression suite. Node/Express API + Playwright worke
 - `server/engine` Playwright capture + `viewports.js` · `server/crawler` sitemap/BFS · `server/heuristics/evaluate.js` DOM checks
 - `server/queue/jobQueue.js` run pipeline + cross-viewport checks · `server/visual` baseline + pixelmatch · `server/storage` run persistence
 - `server/routes` API + SSRF validation · `web/` UI (index = submit, results = list/detail via `?id=`)
-- `data/` runtime output (gitignored): `runs/<id>/`, `baselines/<siteHash>/<slug>/<viewport>.png`
+- `data/` runtime output (gitignored): `runs/<id>/`, `baselines/<owner>/<siteHash>/<slug>/<viewport>.png`
 
 ## Invariants (do not break)
 1. **7 viewports are exact** (ultrawide 2560x1600, fhd 1920x1080, macbook 1512x982, desktop 1440x900, laptop 1100x700, tablet 768x1024 touch, mobile 390x844 touch). Changing them invalidates all baselines and a unit test enforces it.
@@ -26,7 +26,7 @@ Viewport UI/UX QA + visual regression suite. Node/Express API + Playwright worke
 8. Never commit `data/`, `.env`, `settings.local.json`, or screenshots of third-party sites.
 
 ## Conventions
-- ESM only (`"type":"module"`), Node >= 20, no TypeScript, no new dependencies without a reason in the PR/commit.
+- ESM only (`"type":"module"`), Node >= 22, no TypeScript, no new dependencies without a reason in the PR/commit.
 - UI: accessible (labels, unique ids, >=48px targets), dark premium look, no inline secrets, escape all API strings (`esc()` in `web/api.js`).
 - Tests: pure logic gets a unit test; heuristics changes need a fixture or e2e evidence in the summary.
 - Commits: imperative, scoped (`heuristics: …`, `ui: …`). Push to `main` is allowed; **never force-push**.
@@ -43,13 +43,13 @@ Viewport UI/UX QA + visual regression suite. Node/Express API + Playwright worke
   - VPS & live deployment (beyond GH Pages): reverse proxy (Caddy/Nginx), SSL, healthcheck (`GET /healthz`), and deployment guide.
   - Robots.txt parser and strict compliance across BFS and sitemaps.
   - High-ROI site profiling, lead intelligence extraction, and executive audit reports with print/PDF engine.
-- Tail End (Completed): Auth/API keys, quotas, Stripe paywall, S3/R2, share permalinks, Postgres driver, multi-worker queue.
-- Next: Logi-Ink Worker proxy for `/api/billing/*`, precision/recall on live audits, private-IP subresource blocking.
+- Tail End (Completed): Auth/API keys, quotas, Stripe paywall, S3/R2, share permalinks, Postgres driver, multi-worker queue, Logi-Ink billing proxy, private-IP navGuard.
+- Next: Live precision/recall calibration; screenshot-pixel contrast / fuller a11y beyond DOM heuristics.
 
 ## Known weak spots
 - Complex CSS pseudo-elements (::before/::after) background compositing can require indeterminate contrast flagging.
 - Collision check samples top 60 elements with viewport-intersection filtering.
-- Expired job leases are reclaimed; set `QAZAR_SINGLE_WORKER=1` only for a lone worker that should steal live leases on boot.
+- Durable SQLite/Postgres job leases; `MAX_CONCURRENT_RUNS` (default 2) caps parallel Chromium work per worker. Set `QAZAR_SINGLE_WORKER=1` on a lone host so boot steals live leases and requeues stuck crawls (`Server restarted — job requeued`).
 - `evaluateCrossViewport` compares `desktop` vs `tablet` and `mobile` across H1/H2 and detects breakpoint style inversions.
 
 ## Agent tooling map

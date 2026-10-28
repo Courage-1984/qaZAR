@@ -1,13 +1,15 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import {
+  buildDiscoveryPayload,
+  cloudflaredCandidates,
+  discoveryGistId,
+  parseTryCloudflareUrl,
+} from './tunnelParse.js';
+import { TUNNEL_READY_MS, cloudflaredTunnelArgs } from './tunnelArgs.js';
 
 export function findCloudflaredBin() {
-  const cfPaths = [
-    'cloudflared',
-    'C:\\Program Files (x86)\\cloudflared\\cloudflared.exe',
-    'C:\\Program Files\\cloudflared\\cloudflared.exe',
-  ];
-  for (const p of cfPaths) {
+  for (const p of cloudflaredCandidates()) {
     try {
       if (p === 'cloudflared' || fs.existsSync(p)) return p;
     } catch {
@@ -30,17 +32,16 @@ export async function startPublicTunnel(port = 8787) {
     if (!cfBin) return resolve(null);
 
     try {
-      const proc = spawn(cfBin, ['tunnel', '--url', `http://localhost:${port}`], {
+      const proc = spawn(cfBin, cloudflaredTunnelArgs(port), {
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
       });
 
       const onData = (data) => {
-        const str = data.toString();
-        const match = str.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
-        if (match && !settled) {
+        const url = parseTryCloudflareUrl(data.toString());
+        if (url && !settled) {
           settled = true;
-          resolve({ url: match[0], proc });
+          resolve({ url, proc });
         }
       };
 
@@ -58,7 +59,7 @@ export async function startPublicTunnel(port = 8787) {
           settled = true;
           resolve(null);
         }
-      }, 15000);
+      }, TUNNEL_READY_MS);
     } catch {
       resolve(null);
     }
@@ -69,19 +70,11 @@ export async function startPublicTunnel(port = 8787) {
  * Publishes live discovery metadata (tunnel URL, local IP) to public GitHub Gist
  * so that GitHub Pages on mobile and outside networks can auto-detect and connect.
  */
-export async function publishDiscovery({ url, lanUrl, gistId = process.env.DISCOVERY_GIST_ID || '524347c4e86d2457bcb527dc8249e95e' }) {
+export async function publishDiscovery({
+  url, lanUrl, gistId = discoveryGistId(),
+}) {
   try {
-    const payload = JSON.stringify({
-      files: {
-        'qazar-discovery.json': {
-          content: JSON.stringify({
-            url: url || null,
-            lanUrl: lanUrl || null,
-            updatedAt: new Date().toISOString(),
-          }),
-        },
-      },
-    });
+    const payload = JSON.stringify(buildDiscoveryPayload({ url, lanUrl }));
     const proc = spawn('gh', ['api', '-X', 'PATCH', `/gists/${gistId}`, '--input', '-'], {
       stdio: ['pipe', 'ignore', 'ignore'],
       windowsHide: true,
@@ -92,4 +85,3 @@ export async function publishDiscovery({ url, lanUrl, gistId = process.env.DISCO
     console.warn('[qaZAR Discovery] Could not publish discovery gist:', err.message);
   }
 }
-

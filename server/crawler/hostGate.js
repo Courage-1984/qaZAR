@@ -1,13 +1,13 @@
 import { config } from '../config.js';
+import { boundedGapSec, gapWaitMs } from './hostGap.js';
 
 const lanes = new Map();
 const remembered = new Map();
 
 function gapMs(origin, robotsDelaySec) {
   if (robotsDelaySec != null) remembered.set(origin, Number(robotsDelaySec) || 0);
-  const sec = remembered.get(origin) || 0;
-  const bounded = Math.min(Math.max(sec, config.hostGapSec), config.hostGapCapSec);
-  return bounded * 1000;
+  const sec = remembered.has(origin) ? remembered.get(origin) : 0;
+  return boundedGapSec(sec, config.hostGapSec, config.hostGapCapSec) * 1000;
 }
 
 /** Wait for this origin's crawl gap. Call the returned function when the fetch finishes. */
@@ -25,7 +25,7 @@ export async function waitForHost(origin, robotsDelaySec, deps = {}) {
   lane.active += 1;
   const gap = gapMs(origin, robotsDelaySec);
   const stamp = now();
-  const wait = lane.last ? Math.max(0, lane.last + gap - stamp) : 0;
+  const wait = gapWaitMs(lane.last, stamp, gap);
   lane.last = stamp + wait;
   if (wait) await sleep(wait);
   return () => {

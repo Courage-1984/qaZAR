@@ -1,17 +1,28 @@
 import { generatePdfReport } from '../report/pdfReport.js';
 import { renderReportPdf } from '../report/renderPdf.js';
+import { resolveAgencyBrand, resolveAgencyInbox } from '../report/mailer.js';
 import { sendReport } from '../mail/sendReport.js';
 import { storage } from '../storage/storageAdapter.js';
 import { save } from '../storage/runStore.js';
 import { enqueue } from './jobs.js';
+import { firstLine as emailErrorLine } from '../util/firstLine.js';
+import { EMAIL_BACKOFF_MS } from './workerPolicy.js';
 
-const BACKOFF = [60_000, 5 * 60_000, 15 * 60_000];
+export { emailErrorLine };
+export const BACKOFF = EMAIL_BACKOFF_MS;
+
+async function clearEmailError(run) {
+  if (!run.emailError) return;
+  run.emailError = null;
+  await save(run);
+}
 
 async function ensurePdf(run) {
   if (storage.hasArtifact(run.id, 'report.pdf')) return;
-  const agency = process.env.AGENCY_INBOX || 'consulting@qazar.dev';
-  const html = generatePdfReport(run, agency);
-  await renderReportPdf(html, run.id, { agency, domain: run.input?.domain || '' });
+  const leadEmail = resolveAgencyInbox() || 'consulting@qazar.dev';
+  const brand = resolveAgencyBrand();
+  const html = generatePdfReport(run, leadEmail, { agency: brand });
+  await renderReportPdf(html, run.id, { agency: brand, domain: run.input?.domain || '' });
 }
 
 /** Write the PDF and send mail. Mail failure enqueues a retry and does not recrawl. */
@@ -19,12 +30,9 @@ export async function finishRun(run) {
   try {
     await ensurePdf(run);
     await sendReport({ run });
-    if (run.emailError) {
-      run.emailError = null;
-      await save(run);
-    }
+    await clearEmailError(run);
   } catch (e) {
-    run.emailError = String(e.message || e).split('\n')[0];
+    run.emailError = emailErrorLine(e);
     await save(run);
     await enqueue(run.id, 'email', BACKOFF[0]);
   }
@@ -33,10 +41,5 @@ export async function finishRun(run) {
 export async function deliverMail(run) {
   await ensurePdf(run);
   await sendReport({ run });
-  if (run.emailError) {
-    run.emailError = null;
-    await save(run);
-  }
+  await clearEmailError(run);
 }
-
-export { BACKOFF };

@@ -1,13 +1,23 @@
 import crypto from 'node:crypto';
 import { getPool } from '../storage/postgresDb.js';
 import { getRun, save } from '../storage/runStore.js';
+import { isDeadAttempt, jobErrorLine, nextAttempts } from './jobPolicy.js';
+import {
+  LEASE_EXPIRED_ERROR,
+  availableAt,
+  canCancelRunStatus,
+  expiredLeaseDecision,
+  foldJobCounts,
+  leaseUntil,
+} from './jobTiming.js';
+import { cancelableJobStatusSql } from './jobStatuses.js';
 
 export async function enqueue(runId, kind = 'audit', delayMs = 0) {
   const now = Date.now();
   await getPool().query(`
     INSERT INTO jobs (id, run_id, kind, status, available_at, lease_until, attempts, last_error, worker_id)
     VALUES ($1, $2, $3, 'queued', $4, NULL, 0, NULL, NULL)
-  `, [crypto.randomUUID(), runId, kind, now + delayMs]);
+  `, [crypto.randomUUID(), runId, kind, availableAt(now, delayMs)]);
 }
 
 /** SKIP LOCKED so multiple workers can claim without fighting. */
@@ -25,14 +35,14 @@ export async function claim(workerId, leaseMs, now = Date.now()) {
     FROM next
     WHERE j.id = next.id
     RETURNING j.id, j.run_id, j.kind, j.attempts
-  `, [workerId, now + leaseMs, now]);
+  `, [workerId, leaseUntil(now, leaseMs), now]);
   return rows[0] || null;
 }
 
 export async function heartbeat(jobId, leaseMs, now = Date.now()) {
   await getPool().query(
     `UPDATE jobs SET lease_until = $1 WHERE id = $2 AND status = 'leased'`,
-    [now + leaseMs, jobId],
+    [leaseUntil(now, leaseMs), jobId],
   );
 }
 
@@ -44,20 +54,20 @@ export async function complete(jobId) {
 }
 
 export async function retryLater(jobId, delayMs, err, now = Date.now()) {
-  const message = String(err?.message || err || '').split('\n')[0];
+  const message = jobErrorLine(err);
   await getPool().query(`
     UPDATE jobs
     SET status = 'queued', attempts = attempts + 1, available_at = $1, lease_until = NULL,
         worker_id = NULL, last_error = $2
     WHERE id = $3
-  `, [now + delayMs, message, jobId]);
+  `, [availableAt(now, delayMs), message, jobId]);
 }
 
 export async function fail(jobId, err, now = Date.now()) {
   const { rows } = await getPool().query('SELECT attempts FROM jobs WHERE id = $1', [jobId]);
-  const attempts = (rows[0]?.attempts || 0) + 1;
-  const message = String(err?.message || err || '').split('\n')[0];
-  if (attempts >= 3) {
+  const attempts = nextAttempts(rows[0]?.attempts);
+  const message = jobErrorLine(err);
+  if (isDeadAttempt(attempts)) {
     await getPool().query(
       `UPDATE jobs SET status = 'failed', attempts = $1, last_error = $2, lease_until = NULL WHERE id = $3`,
       [attempts, message, jobId],
@@ -77,11 +87,11 @@ export async function reclaimExpired(now = Date.now()) {
     [now],
   );
   for (const row of rows) {
-    const attempts = row.attempts + 1;
-    if (attempts >= 3) {
+    const { attempts, dead } = expiredLeaseDecision(row.attempts);
+    if (dead) {
       await getPool().query(
-        `UPDATE jobs SET status = 'failed', attempts = $1, last_error = 'lease expired', lease_until = NULL WHERE id = $2`,
-        [attempts, row.id],
+        `UPDATE jobs SET status = 'failed', attempts = $1, last_error = $2, lease_until = NULL WHERE id = $3`,
+        [attempts, LEASE_EXPIRED_ERROR, row.id],
       );
     } else {
       await getPool().query(`
@@ -93,20 +103,18 @@ export async function reclaimExpired(now = Date.now()) {
 }
 
 export async function countJobs() {
-  const counts = { queued: 0, leased: 0 };
   const { rows } = await getPool().query(`SELECT status, COUNT(*)::int AS n FROM jobs GROUP BY status`);
-  for (const row of rows) counts[row.status] = row.n;
-  return counts;
+  return foldJobCounts(rows);
 }
 
 export async function cancelRun(id) {
   const run = await getRun(id);
-  if (run && !['done', 'failed'].includes(run.status)) {
+  if (run && canCancelRunStatus(run.status)) {
     run.status = 'cancelled';
     await save(run);
   }
   await getPool().query(`
     UPDATE jobs SET status = 'cancelled', lease_until = NULL
-    WHERE run_id = $1 AND status IN ('queued', 'leased')
+    WHERE run_id = $1 AND status IN (${cancelableJobStatusSql()})
   `, [id]);
 }

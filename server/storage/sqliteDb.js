@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { config } from '../config.js';
+import { inflightStatusSql } from './inflightStatus.js';
+import { coreTablesDdl } from './schemaDdl.js';
 
 let db;
 let dbFile = '';
@@ -30,36 +32,7 @@ function schema(database) {
   database.exec(`
     PRAGMA journal_mode = WAL;
     PRAGMA busy_timeout = 5000;
-    CREATE TABLE IF NOT EXISTS runs (
-      id TEXT PRIMARY KEY,
-      owner_id TEXT NOT NULL,
-      share_token TEXT NOT NULL UNIQUE,
-      status TEXT NOT NULL,
-      payload TEXT NOT NULL,
-      lease_until INTEGER
-    );
-    CREATE TABLE IF NOT EXISTS jobs (
-      id TEXT PRIMARY KEY,
-      run_id TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      status TEXT NOT NULL,
-      available_at INTEGER NOT NULL,
-      lease_until INTEGER,
-      attempts INTEGER NOT NULL DEFAULT 0,
-      last_error TEXT,
-      worker_id TEXT
-    );
-    CREATE TABLE IF NOT EXISTS owners (
-      owner_id TEXT PRIMARY KEY,
-      tier TEXT NOT NULL DEFAULT 'free',
-      stripe_customer_id TEXT
-    );
-    CREATE TABLE IF NOT EXISTS baseline_meta (
-      owner_id TEXT NOT NULL,
-      site_hash TEXT NOT NULL,
-      updated_at INTEGER NOT NULL,
-      PRIMARY KEY (owner_id, site_hash)
-    );
+    ${coreTablesDdl('INTEGER')}
   `);
   migrateBaselineMeta(database);
 }
@@ -108,7 +81,7 @@ export function listRunPayloads() {
 }
 
 export function countInflight(ownerId) {
-  const row = getDb().prepare(`SELECT COUNT(*) AS n FROM runs WHERE owner_id = ? AND status IN ('queued', 'crawling', 'capturing')`).get(ownerId);
+  const row = getDb().prepare(`SELECT COUNT(*) AS n FROM runs WHERE owner_id = ? AND status IN (${inflightStatusSql()})`).get(ownerId);
   return row?.n || 0;
 }
 
@@ -145,7 +118,7 @@ export function deleteBaselineMeta(ownerId, siteHash) {
 }
 
 export function countActiveRuns() {
-  const row = getDb().prepare(`SELECT COUNT(*) AS n FROM runs WHERE status IN ('queued', 'crawling', 'capturing')`).get();
+  const row = getDb().prepare(`SELECT COUNT(*) AS n FROM runs WHERE status IN (${inflightStatusSql()})`).get();
   return row?.n || 0;
 }
 

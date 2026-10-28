@@ -3,41 +3,33 @@ import { getReportStyles } from './reportStyles.js';
 import { renderSeoSection } from './seoSection.js';
 import { renderLeadSection } from './leadSection.js';
 import { esc } from './esc.js';
-
-function list(items) {
-  return items.map((item) => `<li>${esc(item)}</li>`).join('');
-}
-
-function findings(clusters) {
-  return clusters.map((c) => {
-    const label = c.severity === 'info' ? 'needs review' : c.severity;
-    return `<div class="cluster">
-      <div class="split">
-        <b class="${c.severity === 'error' ? 'bad' : 'warn'}">${esc(label)}: ${esc(c.rule)}</b>
-        <span class="meta">${esc(c.observed)} · ${c.totalOccurrences} time(s)</span>
-      </div>
-      <div>${esc(c.detail)}</div>
-      ${c.selector ? `<div class="meta">${esc(c.selector)}</div>` : ''}
-    </div>`;
-  }).join('');
-}
+import {
+  flattenRoadmap, reportDate, reportDomain, reportTimingLine,
+} from './reportMeta.js';
+import {
+  reportFindingsHtml, reportListHtml, reportSalesSectionsHtml,
+} from './reportHtml.js';
 
 /**
- * On-screen audit. States what was measured. It does not publish a grade or a rebuild quote.
+ * On-screen audit for agency sales: measured facts, component failures, rebuild case.
  */
 export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev', options = {}) {
   const health = calculateHealthScore(run);
-  const { metrics, clusters, facts, roadmap } = health;
-  const domain = run.input?.domain || 'Unknown domain';
-  const agency = options.agency || 'qaZAR';
-  const dateStr = new Date(run.createdAt || Date.now()).toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric',
+  const {
+    metrics, clusters, facts, roadmap, sales, score, grade,
+  } = health;
+  const domain = reportDomain(run);
+  const agency = options.agency || 'Logi-Ink';
+  const dateStr = reportDate(run.createdAt);
+  const shown = (clusters || []).filter((c) => c.severity !== 'info').slice(0, 40);
+  const review = (clusters || []).filter((c) => c.severity === 'info').slice(0, 12);
+  const timing = reportTimingLine(run);
+  const next = flattenRoadmap(roadmap);
+  const salesHtml = reportSalesSectionsHtml({
+    grade, score, sales, domain, agency,
+    techStack: run.siteProfile?.techStack || [],
+    leadEmail, coverageLine: metrics.coverageLine, runId: run.id,
   });
-  const shown = clusters || [];
-  const timing = [
-    run.crawlMs != null ? `Discovery ${run.crawlMs} ms` : '',
-    run.captureMs != null ? `Capture ${run.captureMs} ms` : '',
-  ].filter(Boolean).join('. ');
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -64,36 +56,36 @@ export function generateExecutiveReport(run, leadEmail = 'consulting@qazar.dev',
       <div class="hero-summary">
         <h1>Viewport audit</h1>
         <p>${esc(metrics.coverageLine)} ${metrics.totalPages} page(s) on ${esc(dateStr)}. ${esc(timing)}</p>
-        <p>${metrics.distinctErrors} confirmed error pattern(s), ${metrics.distinctWarnings} confirmed warning pattern(s). Needs-review notes are listed separately and are not counted as failures.</p>
+        <p>${metrics.distinctErrors} critical component failure(s), ${metrics.distinctWarnings} warning component(s). Viewport repeats of the same control are deduplicated. Needs-review notes are listed separately.</p>
       </div>
     </section>
     <section class="impact-section">
       <h2>What was measured</h2>
-      <ul>${list(facts)}</ul>
-      ${metrics.categories.mobileTouch > 0 ? `<p>Small target may be difficult to activate.</p>` : ''}
+      <ul>${reportListHtml(facts)}</ul>
     </section>
     ${renderLeadSection(run.siteProfile)}
     ${shown.length ? `<section class="impact-section">
-      <h2>Findings (${shown.length})</h2>
-      ${findings(shown)}
+      <h2>Business impact findings (${shown.length})</h2>
+      ${reportFindingsHtml(shown)}
     </section>` : ''}
-    ${(roadmap && (roadmap.quickWins.length || roadmap.coreUx.length || roadmap.strategic.length)) ? `
+    ${review.length ? `<section class="impact-section">
+      <h2>Needs review (${review.length})</h2>
+      ${reportFindingsHtml(review)}
+    </section>` : ''}
+    ${next.length ? `
     <section class="impact-section">
-      <h2>What to check next</h2>
-      <ul>${list([...roadmap.quickWins, ...roadmap.coreUx, ...roadmap.strategic])}</ul>
+      <h2>What to prioritise next</h2>
+      <ul>${reportListHtml(next)}</ul>
     </section>` : ''}
     ${renderSeoSection(run.siteProfile)}
-    <section class="cta-card">
-      <h2>Reply about these findings</h2>
-      <p>The notes above are observations from the captures that completed. They are not a quote and they are not a legal opinion.</p>
-      <a class="btn-cta" href="mailto:${esc(leadEmail)}?subject=${encodeURIComponent(`Audit findings – ${domain}`)}&body=${encodeURIComponent(`I reviewed the audit for ${domain}.\n\n${metrics.coverageLine}\n\nRun ID: ${run.id}`)}">Reply by email</a>
-    </section>
-    <div class="footer">Generated by ${esc(agency)}</div>
+    ${salesHtml}
+    <div class="footer">Generated by ${esc(agency)}. Estimates are directional for consultation, not a fixed quote.</div>
   </div>
   <script type="text/plain" id="summary-md"># ${esc(agency)}: ${esc(domain)}
+Grade ${esc(String(grade || '—'))} (${score ?? '—'}/100)
 ${esc(metrics.coverageLine)}
-Confirmed errors: ${metrics.distinctErrors}
-Confirmed warnings: ${metrics.distinctWarnings}
+Critical components: ${metrics.distinctErrors}
+Warning components: ${metrics.distinctWarnings}
 ${facts.map((line) => `- ${line}`).join('\n')}
 Report ID: ${esc(run.id)}</script>
 </body>

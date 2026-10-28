@@ -1,35 +1,27 @@
 import crypto from 'node:crypto';
+import { timingSafeEqual } from '../util/timingSafeEqual.js';
+import {
+  authViaCookie,
+  authViaKey,
+  authViaPages,
+  parseApiKeysList,
+  readBearerToken,
+  readNamedCookie,
+} from './keyParse.js';
+import {
+  authViaLogiInk, logiInkKeyMatches, readLogiInkApiKey,
+} from './logiInkAuth.js';
 
 const COOKIE = 'qazar_session';
 
+let cachedRaw = null;
+let cachedKeys = [];
+
 export function loadApiKeys(raw = process.env.QAZAR_API_KEYS || '') {
-  const keys = [];
-  for (const part of String(raw).split(',').map((s) => s.trim()).filter(Boolean)) {
-    const bits = part.split('.');
-    if (bits.length < 3) continue;
-    keys.push({
-      keyId: bits[0],
-      secret: bits.slice(1, -1).join('.'),
-      ownerId: bits[bits.length - 1],
-    });
-  }
-  return keys;
-}
-
-function same(a, b) {
-  const left = Buffer.from(String(a));
-  const right = Buffer.from(String(b));
-  if (left.length !== right.length || left.length === 0) return false;
-  return crypto.timingSafeEqual(left, right);
-}
-
-function cookieValue(req) {
-  const header = req.get('cookie') || '';
-  for (const bit of header.split(';')) {
-    const [name, ...rest] = bit.trim().split('=');
-    if (name === COOKIE) return decodeURIComponent(rest.join('='));
-  }
-  return '';
+  if (raw === cachedRaw) return cachedKeys;
+  cachedRaw = raw;
+  cachedKeys = parseApiKeysList(raw);
+  return cachedKeys;
 }
 
 export function operatorToken(secret = process.env.QAZAR_OPERATOR_KEY || '') {
@@ -38,34 +30,33 @@ export function operatorToken(secret = process.env.QAZAR_OPERATOR_KEY || '') {
 }
 
 export function readBearer(req) {
-  const header = req.get('authorization') || '';
-  return header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  return readBearerToken(req.get('authorization') || '');
 }
 
 /**
- * A valid bearer key is scoped to its owner. A bad bearer is 401.
- * GitHub Pages calls the tunnel with no key and no cross-site cookie, so that
- * console stays signed in as the operator.
+ * Auth order: Logi-Ink x-api-key → bearer QAZAR key → operator cookie → Pages.
+ * A presented but invalid Logi-Ink or bearer secret is 401.
  */
 export function attachAuth(req, res, next) {
+  const logiKey = readLogiInkApiKey(req);
+  if (logiKey) {
+    if (!logiInkKeyMatches(logiKey)) return res.status(401).json({ error: 'Unauthorized' });
+    req.auth = authViaLogiInk();
+    return next();
+  }
   const bearer = readBearer(req);
   if (bearer) {
-    const key = loadApiKeys().find((item) => same(item.secret, bearer));
+    const key = loadApiKeys().find((item) => timingSafeEqual(item.secret, bearer));
     if (!key) return res.status(401).json({ error: 'Unauthorized' });
-    req.auth = {
-      keyId: key.keyId,
-      ownerId: key.ownerId,
-      via: 'key',
-      publicCaller: key.ownerId !== 'operator',
-    };
+    req.auth = authViaKey(key);
     return next();
   }
-  const token = cookieValue(req);
-  if (token && same(token, operatorToken())) {
-    req.auth = { keyId: 'operator', ownerId: 'operator', via: 'cookie', publicCaller: false };
+  const token = readNamedCookie(req.get('cookie') || '', COOKIE);
+  if (token && timingSafeEqual(token, operatorToken())) {
+    req.auth = authViaCookie();
     return next();
   }
-  req.auth = { keyId: 'pages', ownerId: 'operator', via: 'pages', publicCaller: false };
+  req.auth = authViaPages();
   next();
 }
 

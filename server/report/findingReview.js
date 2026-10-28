@@ -19,13 +19,27 @@ export function triageViolation(v) {
   return 'retained';
 }
 
+export function findingKey(page, viewport, v) {
+  return `${page.slug || page.url}|${viewport}|${v.rule}|${v.selector || ''}`;
+}
+
+export function countByStatus(findings) {
+  const counts = { retained: 0, withdrawn: 0, needsReview: 0 };
+  for (const f of findings) {
+    if (f.status === 'withdrawn') counts.withdrawn++;
+    else if (f.status === 'needs-review') counts.needsReview++;
+    else counts.retained++;
+  }
+  return counts;
+}
+
 /** Flatten run violations with a triage status. Optional overrides: { [key]: 'withdrawn'|'retained'|'needs-review' }. */
 export function reviewFindings(run, overrides = {}) {
   const findings = [];
   for (const page of run?.pages || []) {
     for (const [viewport, rec] of Object.entries(page.viewports || {})) {
       for (const v of rec.violations || []) {
-        const key = `${page.slug || page.url}|${viewport}|${v.rule}|${v.selector || ''}`;
+        const key = findingKey(page, viewport, v);
         const status = overrides[key] || triageViolation(v);
         findings.push({
           key,
@@ -41,11 +55,5 @@ export function reviewFindings(run, overrides = {}) {
       }
     }
   }
-  const counts = { retained: 0, withdrawn: 0, needsReview: 0 };
-  for (const f of findings) {
-    if (f.status === 'withdrawn') counts.withdrawn++;
-    else if (f.status === 'needs-review') counts.needsReview++;
-    else counts.retained++;
-  }
-  return { counts, findings };
+  return { counts: countByStatus(findings), findings };
 }

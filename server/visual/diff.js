@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
+import { diffPercent, sizeChanged } from './diffMetrics.js';
 
 /** Pad a PNG onto a white canvas of the given size. */
 function pad(png, w, h) {
@@ -11,9 +12,6 @@ function pad(png, w, h) {
   return out;
 }
 
-/** Ignore sub-2% dimension jitter from font and lazy-load height. */
-const shifted = (from, to) => from > 0 && Math.abs(to - from) / from > 0.02;
-
 /**
  * Compare two PNG files; write highlighted diff to diffPath.
  * Returns { diffPixels, diffPercent, sizeChanged, width, height }.
@@ -21,7 +19,7 @@ const shifted = (from, to) => from > 0 && Math.abs(to - from) / from > 0.02;
 export function diffImages(basePath, currentPath, diffPath) {
   const a = PNG.sync.read(fs.readFileSync(basePath));
   const b = PNG.sync.read(fs.readFileSync(currentPath));
-  const sizeChanged = shifted(a.width, b.width) || shifted(a.height, b.height);
+  const changed = sizeChanged(a, b);
   const w = Math.max(a.width, b.width);
   const h = Math.max(a.height, b.height);
   const pa = pad(a, w, h);
@@ -29,5 +27,11 @@ export function diffImages(basePath, currentPath, diffPath) {
   const diff = new PNG({ width: w, height: h });
   const diffPixels = pixelmatch(pa.data, pb.data, diff.data, w, h, { threshold: 0.1, includeAA: false });
   fs.writeFileSync(diffPath, PNG.sync.write(diff));
-  return { diffPixels, diffPercent: (diffPixels / (w * h)) * 100, sizeChanged, width: w, height: h };
+  return {
+    diffPixels,
+    diffPercent: diffPercent(diffPixels, w, h),
+    sizeChanged: changed,
+    width: w,
+    height: h,
+  };
 }

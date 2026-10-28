@@ -2,26 +2,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getRun } from '../storage/runStore.js';
 import { storage } from '../storage/storageAdapter.js';
-
-const MEDIA = /\.(png|jpe?g|webp|gif|pdf)$/i;
+import { canReadArtifact, isPathInside, parseArtifactPath } from './artifactAccess.js';
 
 /** Screenshots for the Pages console. A bearer key may only read its own runs. */
 export async function artifactHandler(req, res) {
-  const parts = req.path.split('/').filter(Boolean);
-  const runId = parts.shift();
-  const rel = parts.join('/');
-  if (!runId || !rel || rel.includes('..') || path.isAbsolute(rel)) {
+  const parsed = parseArtifactPath(req.path);
+  if (!parsed) return res.status(404).json({ error: 'Not found' });
+  const run = await getRun(parsed.runId);
+  if (!canReadArtifact(req.auth, run, parsed.rel)) {
     return res.status(404).json({ error: 'Not found' });
   }
-  const run = await getRun(runId);
-  if (!run) return res.status(404).json({ error: 'Not found' });
-  if (req.auth?.via === 'key' && run.ownerId !== req.auth.ownerId) {
-    return res.status(404).json({ error: 'Not found' });
-  }
-  // Pages/anonymous may only fetch media; run.json and other payloads stay private.
-  if (req.auth?.via !== 'key' && req.auth?.via !== 'cookie' && !MEDIA.test(rel)) {
-    return res.status(404).json({ error: 'Not found' });
-  }
+  const { rel } = parsed;
   if (storage.driver !== 'local') {
     const buf = await storage.readArtifact(run.id, rel);
     if (!buf) return res.status(404).json({ error: 'Not found' });
@@ -30,7 +21,7 @@ export async function artifactHandler(req, res) {
   }
   const root = path.resolve(storage.getRunDir(run.id));
   const abs = path.resolve(storage.getArtifactPath(run.id, rel));
-  if (!abs.startsWith(root + path.sep) || !fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
+  if (!isPathInside(root, abs) || !fs.existsSync(abs) || !fs.statSync(abs).isFile()) {
     return res.status(404).json({ error: 'Not found' });
   }
   res.sendFile(abs);

@@ -1,7 +1,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { config } from '../config.js';
-import { normalizeUrl, isAssetUrl, sameHost } from './normalize.js';
 import { fetchPublicText } from './safeFetch.js';
+import { acceptSitemapLoc, onHost, sitemapLocsFromRobots } from './sitemapFilter.js';
 
 const parser = new XMLParser({ ignoreAttributes: true });
 const arr = (x) => (x == null ? [] : Array.isArray(x) ? x : [x]);
@@ -12,10 +12,6 @@ export function parseSitemapXml(xml) {
   const urls = arr(doc.urlset?.url).map((u) => u.loc).filter(Boolean);
   const sitemaps = arr(doc.sitemapindex?.sitemap).map((s) => s.loc).filter(Boolean);
   return { urls, sitemaps };
-}
-
-function onHost(url, origin) {
-  return !origin || sameHost(url, origin);
 }
 
 /**
@@ -30,8 +26,8 @@ export async function collectSitemapUrls(sitemapUrl, limit, seen = new Set(), co
   const { urls, sitemaps } = parseSitemapXml(text);
   const out = [];
   for (const u of urls) {
-    const n = normalizeUrl(String(u).trim());
-    if (!n || isAssetUrl(n) || !onHost(n, origin)) continue;
+    const n = acceptSitemapLoc(u, origin);
+    if (!n) continue;
     out.push(n);
     if (out.length >= limit) return out;
   }
@@ -56,12 +52,10 @@ export async function collectSitemapUrls(sitemapUrl, limit, seen = new Set(), co
 /** Discover sitemap URLs from robots.txt, falling back to /sitemap.xml. Off-site entries are dropped. */
 export async function discoverSitemaps(domain) {
   const origin = new URL(domain).origin;
-  const found = [];
+  let found = [];
   try {
     const { text } = await fetchPublicText(`${origin}/robots.txt`, { timeout: 5000, label: 'robots' });
-    for (const m of text.matchAll(/^\s*sitemap:\s*(\S+)/gim)) {
-      if (onHost(m[1], origin)) found.push(m[1]);
-    }
+    found = sitemapLocsFromRobots(text, origin);
   } catch {
     /* no robots */
   }

@@ -1,42 +1,17 @@
 import { esc } from './esc.js';
+import { pathOf, seoScoreColor, summarizeSeoInfo } from './seoHelpers.js';
 
 /** Search-appearance block for the executive report. All interpolated text is escaped. */
-
-function pathOf(url) {
-  try {
-    const u = new URL(url);
-    return `${u.pathname}${u.search}` || '/';
-  } catch {
-    return String(url || '');
-  }
-}
-
-const INFO = {
-  'seo-title-long': 'long titles',
-  'seo-description-long': 'long descriptions',
-  'seo-multiple-h1': 'pages with multiple H1s',
-  'seo-missing-canonical': 'pages without a canonical',
-  'seo-canonical-relative': 'relative canonicals',
-  'seo-canonical-offsite': 'cross-host canonicals',
-  'seo-jsonld-missing': 'pages without JSON-LD',
-  'seo-missing-lang': 'pages missing html lang',
-  'seo-missing-og': 'pages missing Open Graph',
-};
 
 export function renderSeoSection(profile) {
   const seo = profile?.seo;
   if (!seo) return '';
   const issues = seo.issues || [];
   const shown = issues.filter((i) => i.severity !== 'info').slice(0, 8);
-  const info = new Map();
-  for (const item of issues) {
-    if (item.severity !== 'info') continue;
-    info.set(item.id, (info.get(item.id) || 0) + 1);
-  }
-  const infoLine = [...info.entries()].map(([id, n]) => `${n} ${INFO[id] || id}`).join(' · ');
+  const infoLine = summarizeSeoInfo(issues);
   const rows = (seo.pages || []).slice(0, 15);
   const extra = (seo.pages || []).length - rows.length;
-  const color = seo.score < 70 ? '#ef4444' : seo.score < 90 ? '#f59e0b' : '#10b981';
+  const color = seoScoreColor(seo.score);
   const errors = issues.filter((i) => i.severity === 'error').length;
   const warns = issues.filter((i) => i.severity === 'warn').length;
 

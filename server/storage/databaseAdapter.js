@@ -5,6 +5,10 @@ import { storage } from './storageAdapter.js';
 import {
   awaitDb, dbDriver, deleteRunRow, listRunPayloads, readByShare, readRun, upsertRun,
 } from './db.js';
+import {
+  formatSseData, listRunSummary, newRunRecord, runEventPayload,
+} from './runRecord.js';
+import { filterRunsByOwner, runVisibleToOwner, sortRunsNewestFirst } from './runOwnership.js';
 
 /**
  * Run index in SQLite or Postgres, with run.json kept beside the screenshots.
@@ -36,27 +40,14 @@ class SqlRunStore {
   }
 
   async create(input, { ownerId = 'operator' } = {}) {
-    const run = {
-      id: crypto.randomUUID(),
-      shareToken: crypto.randomUUID(),
-      ownerId,
-      createdAt: new Date().toISOString(),
-      input,
-      status: 'queued',
-      progress: { pagesDone: 0, pagesTotal: 0 },
-      pages: [],
-      summary: null,
-      error: null,
-    };
+    const run = newRunRecord(input, { ownerId });
     await this.save(run);
     return run;
   }
 
   async get(id, { ownerId = null } = {}) {
     const run = await readRun(id);
-    if (!run) return null;
-    if (ownerId && run.ownerId !== ownerId) return null;
-    return run;
+    return runVisibleToOwner(run, ownerId) ? run : null;
   }
 
   async getByShareToken(token) {
@@ -65,28 +56,20 @@ class SqlRunStore {
   }
 
   async list({ ownerId = null } = {}) {
-    let list = await listRunPayloads();
-    if (ownerId) list = list.filter((r) => r.ownerId === ownerId);
-    return list
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map(({ pages, ...rest }) => rest);
+    const list = filterRunsByOwner(await listRunPayloads(), ownerId);
+    return sortRunsNewestFirst(list).map(listRunSummary);
   }
 
   async save(run) {
     if (!(await readRun(run.id)) && !run.shareToken) return;
     await upsertRun(run);
     storage.writeArtifact(run.id, 'run.json', JSON.stringify(run));
-    this.broadcast(run.id, {
-      status: run.status,
-      progress: run.progress,
-      summary: run.summary,
-    });
+    this.broadcast(run.id, runEventPayload(run));
   }
 
   async delete(id, { ownerId = null } = {}) {
     const run = await readRun(id);
-    if (!run) return false;
-    if (ownerId && run.ownerId !== ownerId) return false;
+    if (!runVisibleToOwner(run, ownerId)) return false;
     await deleteRunRow(id);
     storage.deleteRunArtifacts(id);
     this.events.delete(id);
@@ -103,7 +86,7 @@ class SqlRunStore {
   broadcast(id, data) {
     const subs = this.events.get(id);
     if (!subs?.size) return;
-    const payload = `data: ${JSON.stringify(data)}\n\n`;
+    const payload = formatSseData(data);
     for (const res of subs) {
       try { res.write(payload); } catch { subs.delete(res); }
     }

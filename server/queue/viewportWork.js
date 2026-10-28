@@ -8,23 +8,26 @@ import { diffImages } from '../visual/diff.js';
 import { runPath } from '../storage/runStore.js';
 import { siteHash, storage } from '../storage/storageAdapter.js';
 import { touchBaseline } from '../storage/db.js';
+import { firstLine } from '../util/firstLine.js';
+import { viewportTimingLine } from '../engine/captureResult.js';
+import { crossViewportViolations } from './crossViewport.js';
+import {
+  emptyViewportRecord, viewportCaptureOptions, viewportShotRels,
+} from './viewportPaths.js';
+import { applyCaptureSuccess, applyDiffSuccess, deskViewportRec } from './viewportApply.js';
 
 export async function processViewport(run, page, vp) {
   const dir = runPath(run.id);
-  const rel = path.join('shots', page.slug, `${vp.name}.png`);
-  const abs = path.join(dir, rel);
-  const rec = { status: 'pending', shot: null, base: null, diff: null, diffPercent: null, violations: [], metrics: null, error: null };
+  const rels = viewportShotRels(page.slug, vp.name);
+  const abs = path.join(dir, rels.shot);
+  const rec = emptyViewportRecord();
   page.viewports[vp.name] = rec;
   try {
     let lastErr;
     let res;
     for (let attempt = 0; attempt < 2 && !res; attempt++) {
       try {
-        res = await capturePage(page.url, vp, abs, {
-          collectLeads: vp.name === 'desktop',
-          deterministic: run.input?.deterministic === true,
-          fast: Boolean(run.input?.publicCaller),
-        });
+        res = await capturePage(page.url, vp, abs, viewportCaptureOptions(run, vp));
       } catch (e) {
         lastErr = e;
       }
@@ -35,14 +38,10 @@ export async function processViewport(run, page, vp) {
       delete res.leadHtml;
     }
     if (res.timings) {
-      const m = res.timings;
-      console.log(`qaZAR viewport ${vp.name} goto=${m.gotoMs} idle=${m.idleMs} scroll=${m.scrollMs} fonts=${m.fontMs} shot=${m.shotMs}`);
+      console.log(viewportTimingLine(vp.name, res.timings));
       delete res.timings;
     }
-    rec.shot = rel.replaceAll('\\', '/');
-    rec.violations = res.violations;
-    rec.metrics = res.metrics;
-    if (res.partial) rec.partial = true;
+    applyCaptureSuccess(rec, res, rels.shot);
 
     const domain = run.input.domain;
     const ownerId = run.ownerId || 'operator';
@@ -50,91 +49,41 @@ export async function processViewport(run, page, vp) {
       promote(domain, page.slug, vp.name, abs, ownerId);
       rec.status = 'new';
     } else {
-      const baseRel = path.join('base', page.slug, `${vp.name}.png`);
-      const diffRel = path.join('diffs', page.slug, `${vp.name}.png`);
-      fs.mkdirSync(path.dirname(path.join(dir, baseRel)), { recursive: true });
-      fs.mkdirSync(path.dirname(path.join(dir, diffRel)), { recursive: true });
-      fs.copyFileSync(baselinePath(domain, page.slug, vp.name, ownerId), path.join(dir, baseRel));
-      const d = diffImages(path.join(dir, baseRel), abs, path.join(dir, diffRel));
-      rec.base = baseRel.replaceAll('\\', '/');
-      rec.diff = diffRel.replaceAll('\\', '/');
-      rec.diffPercent = Number(d.diffPercent.toFixed(4));
-      rec.sizeChanged = d.sizeChanged;
-      rec.status = d.diffPercent >= config.diffThresholdPercent || d.sizeChanged ? 'changed' : 'unchanged';
+      fs.mkdirSync(path.dirname(path.join(dir, rels.base)), { recursive: true });
+      fs.mkdirSync(path.dirname(path.join(dir, rels.diff)), { recursive: true });
+      fs.copyFileSync(baselinePath(domain, page.slug, vp.name, ownerId), path.join(dir, rels.base));
+      const d = diffImages(path.join(dir, rels.base), abs, path.join(dir, rels.diff));
+      applyDiffSuccess(rec, rels, d, config.diffThresholdPercent);
     }
     if (rec.shot) await storage.mirrorArtifact(run.id, rec.shot);
     await touchBaseline(siteHash(domain), ownerId);
   } catch (e) {
     rec.status = 'error';
-    rec.error = String(e.message || e).split('\n')[0];
+    rec.error = firstLine(e);
   }
 }
 
 export function evaluateCrossViewport(page) {
-  const deskRec = page.viewports['desktop'] || page.viewports['fhd'] || page.viewports['ultrawide'];
-  const mobRec = page.viewports['mobile'];
-  const tabRec = page.viewports['tablet'];
+  const deskRec = deskViewportRec(page.viewports);
+  const mobRec = page.viewports.mobile;
+  const tabRec = page.viewports.tablet;
   if (!deskRec?.metrics) return;
 
-  const deskH1 = deskRec.metrics.headings?.h1;
-  const deskH2 = deskRec.metrics.headings?.h2;
+  const { tablet, mobile } = crossViewportViolations({
+    deskH1: deskRec.metrics.headings?.h1,
+    deskH2: deskRec.metrics.headings?.h2,
+    tabH1: tabRec?.metrics?.headings?.h1,
+    mobH1: mobRec?.metrics?.headings?.h1,
+    mobH2: mobRec?.metrics?.headings?.h2,
+    mobBody: mobRec?.metrics?.bodyFont || 16,
+  });
 
-  if (tabRec?.metrics && deskH1) {
-    const tabH1 = tabRec.metrics.headings?.h1;
-    if (tabH1 && tabH1 > deskH1 + 4) {
-      tabRec.violations = tabRec.violations || [];
-      tabRec.violations.push({
-        rule: 'heading-scale-inverted',
-        severity: 'info',
-        selector: 'h1',
-        rect: null,
-        detail: `Tablet H1 (${tabH1}px) exceeds desktop H1 (${deskH1}px) indicating breakpoint style inversion`,
-      });
-    }
+  if (tablet.length && tabRec) {
+    tabRec.violations = tabRec.violations || [];
+    tabRec.violations.push(...tablet);
   }
-
-  if (mobRec?.metrics) {
-    const mobH1 = mobRec.metrics.headings?.h1;
-    const mobH2 = mobRec.metrics.headings?.h2;
-    const mobBody = mobRec.metrics.bodyFont || 16;
-
-    if (deskH1 && mobH1) {
-      if (mobH1 > deskH1 + 4) {
-        mobRec.violations.push({
-          rule: 'heading-scale-inverted',
-          severity: 'info',
-          selector: 'h1',
-          rect: null,
-          detail: `Mobile H1 (${mobH1}px) exceeds desktop H1 (${deskH1}px) indicating breakpoint style inversion`,
-        });
-      } else if (deskH1 > 28 && mobH1 >= deskH1) {
-        mobRec.violations.push({
-          rule: 'heading-scale-static',
-          severity: 'info',
-          selector: 'h1',
-          rect: null,
-          detail: `H1 size (${mobH1}px) does not scale down on mobile (390px) from desktop (${deskH1}px)`,
-        });
-      }
-      if (mobH1 <= mobBody) {
-        mobRec.violations.push({
-          rule: 'heading-scale-undersized',
-          severity: 'info',
-          selector: 'h1',
-          rect: null,
-          detail: `H1 size (${mobH1}px) is less than or equal to base body font (${mobBody}px) on mobile`,
-        });
-      }
-    }
-
-    if (deskH2 && mobH2 && deskH2 > 24 && mobH2 >= deskH2) {
-      mobRec.violations.push({
-        rule: 'heading-scale-static',
-        severity: 'info',
-        selector: 'h2',
-        rect: null,
-        detail: `H2 size (${mobH2}px) does not scale down on mobile (390px) from desktop (${deskH2}px)`,
-      });
-    }
+  if (mobile.length && mobRec) {
+    mobRec.violations = mobRec.violations || [];
+    mobRec.violations.push(...mobile);
   }
 }
