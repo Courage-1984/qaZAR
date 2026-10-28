@@ -1,11 +1,13 @@
 import { extractPageSeo } from './seo.js';
 import { extractLeads, scoreLeadHeat } from './leads.js';
+import {
+  classifyFunnelUrl, countBlockingHeadScripts, countUnlazyImages, detectTechStack,
+} from './techStack.js';
+import { headerValue } from './htmlBits.js';
 
 export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, headers = null) {
-  const getH = (name) => {
-    if (!headers) return null;
-    return typeof headers.get === 'function' ? headers.get(name) : headers[name.toLowerCase()] || null;
-  };
+  const getH = (name) => headerValue(headers, name) || null;
+  const funnelUrl = classifyFunnelUrl(url);
 
   const signals = {
     url,
@@ -15,7 +17,7 @@ export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, hea
     hasTitle: false,
     hasDescription: false,
     hasOpenGraph: false,
-    techStack: [],
+    techStack: detectTechStack(html),
     security: {
       isHttps: url.startsWith('https:'),
       hasHsts: Boolean(getH('strict-transport-security')),
@@ -24,18 +26,12 @@ export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, hea
     },
     performance: {
       compressed: Boolean(getH('content-encoding')),
-      unlazyImages: (html.match(/<img(?![^>]*\bloading\s*=\s*["']lazy["'])[^>]*>/gi) || []).length,
-      renderBlockingScripts: (() => {
-        const head = (html.match(/<head[^>]*>([\s\S]*?)<\/head>/i) || [])[1] || '';
-        return (head.match(/<script(?![^>]*\b(?:async|defer|type=["']module|type=["']application\/ld\+json))[^>]*src=[^>]*>/gi) || []).length;
-      })(),
+      unlazyImages: countUnlazyImages(html),
+      renderBlockingScripts: countBlockingHeadScripts(html),
       webFonts: (html.match(/fonts\.(?:googleapis|gstatic)\.com|use\.typekit\.net/gi) || []).length,
     },
     funnel: {
-      isPricing: /\b(pricing|plans|tier|billing|upgrade)\b/i.test(url),
-      isCheckout: /\b(checkout|cart|basket|order|pay)\b/i.test(url),
-      isAuth: /\b(signup|register|join|login|signin|auth)\b/i.test(url),
-      isContact: /\b(contact|support|help|sales)\b/i.test(url),
+      ...funnelUrl,
       hasLeadForm: /<form[^>]*>[\s\S]*?<input[^>]*(?:type=["'](?:email|tel)["']|name=["'](?:email|phone|contact|lead)["'])[\s\S]*?<\/form>/i.test(html),
       insecureForms: (url.startsWith('https:') && /<form[^>]*action=["']http:\/\//i.test(html)) ? 1 : 0,
     },
@@ -57,40 +53,6 @@ export function extractCrawlSignals(html = '', url = '', responseTimeMs = 0, hea
   signals.hasDescription = /<meta\s[^>]*name\s*=\s*["']description["']/i.test(html);
   signals.hasOpenGraph = /<meta\s[^>]*property\s*=\s*["']og:image["']/i.test(html) && /<meta\s[^>]*property\s*=\s*["']og:title["']/i.test(html);
   signals.hasCanonical = /<link\s[^>]*rel\s*=\s*["']canonical["']/i.test(html);
-
-  // 2. Tech stack fingerprinting (cheap regex on scripts, meta generators, classes)
-  const tech = new Set();
-  if (/wp-content|wp-includes|<meta\s[^>]*name=["']generator["'][^>]*content=["']WordPress/i.test(html)) {
-    tech.add('WordPress');
-  }
-  if (/cdn\.shopify\.com|Shopify\.theme/i.test(html)) {
-    tech.add('Shopify');
-  }
-  if (/assets\.website-files\.com|wf-page/i.test(html)) {
-    tech.add('Webflow');
-  }
-  if (/__NEXT_DATA__|next\/router/i.test(html)) {
-    tech.add('Next.js');
-  }
-  if (/__NUXT__|nuxt/i.test(html)) {
-    tech.add('Nuxt.js');
-  }
-  if (/react-dom|react\.production\.min\.js/i.test(html)) {
-    tech.add('React');
-  }
-  if (/vue\.min\.js|vue\.global/i.test(html)) {
-    tech.add('Vue');
-  }
-  if (/jquery(?:\.min)?\.js/i.test(html)) {
-    tech.add('jQuery (Legacy)');
-  }
-  if (/googletagmanager\.com|google-analytics\.com/i.test(html)) {
-    tech.add('Google Analytics/GTM');
-  }
-  if (/connect\.facebook\.net/i.test(html)) {
-    tech.add('Meta Pixel');
-  }
-  signals.techStack = [...tech];
 
   const leads = extractLeads(html, url);
   signals.leads = leads;
